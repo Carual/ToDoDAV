@@ -279,7 +279,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
                 />
                 {edits.location.trim() && (
                   <a
-                    className="icon-btn icon-btn-small"
+                    className="location-open"
                     href={mapUrl(edits.location.trim())}
                     target="_blank"
                     rel="noreferrer noopener"

@@ -943,8 +943,38 @@ button {
 
 .location-row {
   display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* Bordered and as tall as the input, so it reads as a button rather than a decoration of the text. */
+.location-open {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 30px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.location-open svg {
+  width: 16px;
+  height: 16px;
+}
+
+.location-open:hover {
+  border-color: var(--text-tertiary);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.location-open:focus-visible {
+  outline: 2px solid var(--p3);
+  outline-offset: 2px;
 }
 
 .location-row .sidebar-text {
