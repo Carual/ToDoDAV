@@ -43,6 +43,7 @@ export interface TaskEdits {
   due?: LocalDate;
   priority: Priority;
   categories: string[];
+  location: string;
 }
 
 // iCalendar PRIORITY is 1 (highest) to 9 (lowest), 0 = undefined. Same mapping as Tasks.org / DAVx5.
@@ -162,6 +163,14 @@ function writeEdits(vtodo: ICAL.Component, edits: TaskEdits, previous?: Task) {
     const categories = new ICAL.Property('categories');
     categories.setValues(edits.categories);
     vtodo.addProperty(categories);
+  }
+
+  // Coordinates written by other apps (Apple Reminders, GEO) describe the old text, so they go with it.
+  const location = edits.location.trim();
+  if (location !== (previous?.location?.trim() ?? '')) {
+    setText(vtodo, 'location', location);
+    vtodo.removeAllProperties('x-apple-structured-location');
+    vtodo.removeAllProperties('geo');
   }
 }
 

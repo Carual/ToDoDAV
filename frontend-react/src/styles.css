@@ -941,6 +941,26 @@ button {
   border-color: var(--text-tertiary);
 }
 
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.location-row .sidebar-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.location-map {
+  display: block;
+  width: 100%;
+  height: 200px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
 .sidebar-note {
   display: block;
   margin-top: 4px;

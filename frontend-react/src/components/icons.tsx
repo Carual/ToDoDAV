@@ -95,6 +95,15 @@ export function ShareIcon(props: IconProps) {
   );
 }
 
+export function MapPinIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 20.5s-6-5.6-6-10.5a6 6 0 0 1 12 0c0 4.9-6 10.5-6 10.5Z" stroke="currentColor" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2" stroke="currentColor" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>

@@ -4,7 +4,7 @@ import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } fr
 import { describeDue, formatDateTime } from '../format.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { CloseIcon, FlagIcon, HashIcon } from './icons.tsx';
+import { CloseIcon, FlagIcon, HashIcon, MapPinIcon } from './icons.tsx';
 import { TaskCheckbox } from './TaskItem.tsx';
 
 interface Props {
@@ -23,7 +23,7 @@ const PRIORITIES: Priority[] = [1, 2, 3, 4];
 const DEFAULT_TIME = '09:00';
 
 function initialEdits(task: Task | undefined): TaskEdits {
-  if (!task) return { summary: '', description: '', priority: 4, categories: [] };
+  if (!task) return { summary: '', description: '', priority: 4, categories: [], location: '' };
   return {
     summary: task.summary,
     description: task.description,
@@ -31,6 +31,7 @@ function initialEdits(task: Task | undefined): TaskEdits {
     due: task.due,
     priority: task.priority,
     categories: task.categories,
+    location: task.location ?? '',
   };
 }
 
@@ -41,8 +42,26 @@ function sameEdits(a: TaskEdits, b: TaskEdits): boolean {
     sameDate(a.start, b.start) &&
     sameDate(a.due, b.due) &&
     a.priority === b.priority &&
-    a.categories.join('\n') === b.categories.join('\n')
+    a.categories.join('\n') === b.categories.join('\n') &&
+    a.location === b.location
   );
+}
+
+/** Google Maps URLs need no API key; the map only loads when the user opens the link. */
+const mapUrl = (location: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
+// Undocumented but keyless; the official Embed API would need every install to bring its own key.
+// If Google ever drops it, the frame breaks but the link above keeps working.
+const embedUrl = (location: string) => `https://www.google.com/maps?q=${encodeURIComponent(location)}&output=embed`;
+/** Waits for typing to pause before reloading the map. */
+const MAP_DELAY_MS = 700;
+
+function useDebounced<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
 }
 
 /** All-day dates carry no time; timed dates always carry one. */
@@ -67,8 +86,11 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
   const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  // Off until asked: the frame sends the location (and the user's Google cookies) to Google.
+  const [showMap, setShowMap] = useState(false);
+  const mapLocation = useDebounced(edits.location.trim(), MAP_DELAY_MS);
 
-  const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
+  const update =(patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
   const dirty = !sameEdits(edits, initialEdits(task));
   // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type).
   const finalEdits: TaskEdits = { ...edits, start: inMode(edits.start, allDay), due: inMode(edits.due, allDay) };
@@ -237,12 +259,47 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
               />
             </SidebarItem>
 
+            <SidebarItem
+              title="Location"
+              action={
+                <label className="switch">
+                  <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} />
+                  <span className="switch-track" aria-hidden="true" />
+                  Map
+                </label>
+              }
+            >
+              <div className="location-row">
+                <input
+                  className="sidebar-text"
+                  value={edits.location}
+                  onChange={(e) => update({ location: e.target.value })}
+                  placeholder="Address or place"
+                  aria-label="Location"
+                />
+                {edits.location.trim() && (
+                  <a
+                    className="icon-btn icon-btn-small"
+                    href={mapUrl(edits.location.trim())}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    aria-label="Open in Google Maps"
+                    title="Open in Google Maps"
+                  >
+                    <MapPinIcon />
+                  </a>
+                )}
+              </div>
+              {showMap && mapLocation && (
+                <iframe className="location-map" src={embedUrl(mapLocation)} title={`Map of ${mapLocation}`} loading="lazy" />
+              )}
+            </SidebarItem>
+
             {task && hasDetails(task) && (
               <SidebarItem title="Details">
                 <dl className="details">
                   {task.status && <Detail term="Status">{task.status.toLowerCase().replace('-', ' ')}</Detail>}
                   {task.percentComplete !== undefined && <Detail term="Progress">{task.percentComplete}%</Detail>}
-                  {task.location && <Detail term="Location">{task.location}</Detail>}
                   {task.url && (
                     <Detail term="Link">
                       {/* Only http(s) becomes a link: a task could carry a javascript: URL. */}
@@ -352,7 +409,7 @@ function DateField({ label, value, allDay, colored = false, onChange }: DateFiel
 }
 
 function hasDetails(task: Task): boolean {
-  return Boolean(task.status || task.percentComplete !== undefined || task.location || task.url || task.created || task.lastModified);
+  return Boolean(task.status || task.percentComplete !== undefined || task.url || task.created || task.lastModified);
 }
 
 function SidebarItem({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
