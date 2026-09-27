@@ -12,7 +12,7 @@ browser (frontend: all the logic)  ──►  backend: /proxy/*  ──►  your
 ```
 
 - **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`.
-- **`backend/`**: a minimal Express proxy. It exists only because browsers cannot talk to most CalDAV servers directly (CORS, auth prompts, mixed hosts). It stores nothing.
+- **`backend/`**: a minimal Express proxy that also serves the built app. It exists only because browsers cannot talk to most CalDAV servers directly (CORS, auth prompts, mixed hosts). It stores nothing.
 
 The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository root. npm manages dependencies. Bun is the primary runtime, and Node works too. Both run the TypeScript directly, with no build step for the backend.
 
@@ -20,7 +20,7 @@ The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository ro
 
 ```
 backend/
-  index.ts        Express app: status check, HTTPS guard, /api/config, /proxy, /feed
+  index.ts        Express app: status check, HTTPS guard, /api/config, /proxy, /feed, the built app
   auth.ts         Basic-auth credential check (constant-time, delayed 401); feed token and path check
   config.ts       Reads and validates env; fails fast listing every problem
   feed/
@@ -40,7 +40,7 @@ frontend-react/
 
 Everything under `/proxy` is forwarded to `CALDAV_URL`. For example, `PROPFIND /proxy/juan/tasks/` becomes `PROPFIND <CALDAV_URL>juan/tasks/`. The request's method, headers and body are sent as-is (including `Authorization`), and the CalDAV server decides what is allowed.
 
-`GET /` is a status check that answers `{"status":"ok"}`, even over plain HTTP, so a fresh install can be checked from anywhere. It reveals nothing else. ToDoDAV listens on `0.0.0.0` by default.
+`GET /api/status` is a status check that answers `{"status":"ok"}`, even over plain HTTP, so a fresh install can be checked from anywhere. It reveals nothing else. ToDoDAV listens on `0.0.0.0` by default.
 
 For `/proxy`, the backend does only five things:
 
@@ -54,7 +54,7 @@ Security headers come from `helmet`, and the proxying itself from `http-proxy-mi
 
 `GET /api/config` tells the frontend what this install offers: `{"feeds":{"tasks":true,"events":false,"token":"..."}}` (`token` only when a feed is on). It has the same HTTPS and credential checks as `/proxy`, because it reveals the feed token, and is sent with `Cache-Control: no-store`. Keep it to settings the frontend needs; never the CalDAV credentials.
 
-The backend does **not** serve the built frontend. In production, the reverse proxy serves `dist/frontend-react/` as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, so they all share one origin. The frontend has client-side routes, so the reverse proxy must answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
+**The built app.** The backend serves `dist/frontend-react/` (`npm run build`) with `express.static`, so one process and one origin cover everything and the reverse proxy only terminates TLS. Any other `GET` gets `index.html` (the client-side routes). The app is HTTPS-only in production like `/proxy`, because a login page served over plain HTTP would send the password in the clear before `/proxy` could refuse it. Serving `dist/frontend-react/` from the reverse proxy instead still works: it forwards `/proxy/*`, `/api/*` and `/feed/*` and answers other non-file paths with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
 ### Feeds (`/feed`)
 
@@ -141,7 +141,7 @@ npm run dev:backend     # the proxy on :3000 (Bun, reads .env, restarts on chang
 npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to the backend
 ```
 
-Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`. `npm run start` runs the backend on Bun without watching. `npm run build:frontend` builds the app into `dist/frontend-react/`.
+Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`. `npm run build` typechecks and builds the app into `dist/frontend-react/` (`npm run build:frontend` skips the typecheck), and `npm run start` then serves the app and backend on Bun without watching.
 
 Run `npm run typecheck` after changes; there is no test suite yet.
 

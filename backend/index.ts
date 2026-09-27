@@ -2,6 +2,7 @@ import express, { type RequestHandler } from 'express';
 import helmet from 'helmet';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { AddressInfo } from 'node:net';
+import { fileURLToPath } from 'node:url';
 import { requireCredentials, requireFeedAccess } from './auth.ts';
 import { loadConfig } from './config.ts';
 import { eventsFeed } from './feed/events.ts';
@@ -11,6 +12,7 @@ const config = loadConfig();
 const app = express();
 app.disable('x-powered-by');
 
+
 // TLS is terminated by the reverse proxy in front of ToDoDAV, which reports the browser's scheme in
 // X-Forwarded-Proto. The header is only believed from loopback/private addresses (where the reverse
 // proxy lives), so a client reaching the port from the internet cannot fake it.
@@ -19,7 +21,7 @@ if (config.production) app.set('trust proxy', 'loopback, linklocal, uniquelocal'
 app.use(helmet());
 
 // Status check: works over plain HTTP too, so a fresh install can be checked from anywhere. Reveals nothing else.
-app.get('/', (_req, res) => {
+app.get('/api/status', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
@@ -75,11 +77,16 @@ const feedAccess = requireFeedAccess(config.feeds.token);
 if (config.feeds.tasks) app.use('/feed/tasks', requireHttps, feedAccess, tasksFeed(config));
 if (config.feeds.events) app.use('/feed/events', requireHttps, feedAccess, eventsFeed(config));
 
+// The built app (npm run build); any other path gets index.html for the client-side routes (/login, /tasks/<uid>).
+// HTTPS-only in production like /proxy, so the login page never sends the password in the clear.
+const frontendDir = fileURLToPath(new URL('../dist/frontend-react/', import.meta.url));
+app.use(requireHttps, express.static(frontendDir));
+app.get('/{*path}', (_req, res) => res.sendFile('index.html', { root: frontendDir }));
+
 const server = app.listen(config.port, config.host, (error) => {
   if (error) throw error;
   const { port } = server.address() as AddressInfo;
-  console.log(`ToDoDAV listening on http://${config.host}:${port}, proxying /proxy to ${config.caldavUrl.href}`);
-  if (config.production) {
+  console.log(`ToDoDAV listening on http://${config.host}:${port}, proxying /proxy to ${config.caldavUrl.href}`);  if (config.production) {
     console.log('Production mode: /proxy and /feed only accept HTTPS requests (via the reverse proxy).');
   } else {
     console.warn('Development mode: plain HTTP is accepted. Set NODE_ENV=production when deploying.');

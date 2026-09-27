@@ -7,7 +7,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - **Your data stays where it is.** Tasks are plain iCalendar `VTODO`s on your CalDAV server. ToDoDAV has no database and stores nothing.
 - **Plays nicely with your other apps.** Keep using Thunderbird, Tasks.org (via DAVx⁵), or any other CalDAV client side by side. When you edit a task, ToDoDAV only changes the fields you touched, so reminders, repeat rules and anything else set by other apps are kept.
 - **No lost edits.** If a task was changed on another device while you were editing it, ToDoDAV refuses to overwrite it and reloads the list instead.
-- **Tiny to run.** One small Node/Bun process plus static files. Built and tested against Radicale.
+- **Tiny to run.** One small Node/Bun process. Built and tested against Radicale.
 
 > **Status:** early (v0.1). Usable day to day for viewing, adding, editing and completing tasks. Deleting tasks and moving them between lists are not there yet.
 
@@ -50,11 +50,11 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
 ## Deploying
 
-1. **Build the web app** into `dist/frontend-react/`:
+1. **Build the web app** into `dist/frontend-react/` (this also typechecks everything):
 
    ```sh
    npm install
-   npm run build:frontend
+   npm run build
    ```
 
 2. **Configure** `.env` (see [.env.example](.env.example)):
@@ -69,25 +69,19 @@ Open http://localhost:5173 and log in with the same username and password you pu
    | `PORT` | Default `3000`. |
    | `FEED_TASKS_ENABLED`, `FEED_EVENTS_ENABLED`, `FEED_TOKEN` | Optional calendar feeds, see [below](#calendar-feeds-google-calendar). |
 
-3. **Start the backend**: `npm start` (Bun) or `npm run start:node` (Node). Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /` answers `{"status":"ok"}` so you can health-check it.
+3. **Start it**: `npm start` (Bun) or `npm run start:node` (Node). One process serves the app and the backend. Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /api/status` answers `{"status":"ok"}` so you can health-check it.
 
-4. **Put it behind your reverse proxy.** The proxy serves the built app as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, all on one domain. Any other path that isn't a file (such as `/login`, `/tasks` or `/tasks/<uid>`) must be answered with `index.html`, so links to the app work. For example, with Caddy:
+4. **Put it behind your reverse proxy** for HTTPS, forwarding everything to ToDoDAV. For example, with Caddy:
 
    ```caddy
    tasks.example.com {
-       @backend path /proxy/* /api/* /feed/*
-       handle @backend {
-           reverse_proxy 127.0.0.1:3000
-       }
-       handle {
-           root * /path/to/tododav/dist/frontend-react
-           try_files {path} /index.html
-           file_server
-       }
+       reverse_proxy 127.0.0.1:3000
    }
    ```
 
-   With nginx/openresty, use `try_files $uri /index.html;` for the app, and make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without that header, requests are rejected with `403`.
+   With nginx/openresty, make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without that header, requests are rejected with `403`.
+
+   If you'd rather have the reverse proxy serve the static files itself, point it at `dist/frontend-react/`, forward `/proxy/*`, `/api/*` and `/feed/*` to ToDoDAV, and answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
 ## Calendar feeds (Google Calendar)
 

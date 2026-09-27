@@ -15,6 +15,7 @@
     "start": "bun backend/index.ts",
     "start:node": "node --env-file-if-exists=.env backend/index.ts",
     "dev:frontend": "vite --config frontend-react/vite.config.ts",
+    "build": "npm run typecheck && npm run build:frontend",
     "build:frontend": "vite build --config frontend-react/vite.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p frontend-react"
   },
