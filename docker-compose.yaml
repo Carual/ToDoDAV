@@ -5,33 +5,13 @@ services:
   tododav:
     build: .
     image: tododav
+    container_name: tododav
     restart: unless-stopped
     env_file: .env
     # Bun as PID 1 would ignore SIGTERM, so `docker compose down` would wait 10 s and then kill it.
     init: true
-    # Only programs on this machine (such as a reverse proxy on the host) can reach it.
+    # Open to any address, so a fresh install can be checked with `GET /api/status` from anywhere.
+    # Plain HTTP from the internet gets 403 on everything else in production. Once a reverse proxy
+    # runs on this machine, use `127.0.0.1:3852:3852` so only programs on the host can reach it.
     ports:
-      - 127.0.0.1:3852:3852
-
-  # Or let Caddy handle HTTPS in the same stack: uncomment this, remove `ports` above, and create a
-  # Caddyfile next to this file with:
-  #
-  #   tasks.example.com {
-  #       reverse_proxy tododav:3852
-  #   }
-  #
-  # caddy:
-  #   image: caddy:2
-  #   restart: unless-stopped
-  #   ports:
-  #     - 80:80
-  #     - 443:443
-  #     - 443:443/udp
-  #   volumes:
-  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
-  #     - caddy_data:/data
-  #     - caddy_config:/config
-
-# volumes:
-#   caddy_data:
-#   caddy_config:
+      - 3852:3852

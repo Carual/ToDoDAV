@@ -92,7 +92,7 @@ docker compose up -d --build
 ```
 
 - In `.env`, set `NODE_ENV=production` (or remove the line) and leave `HOST` unset: inside the container ToDoDAV must listen on `0.0.0.0`.
-- The port is published as `127.0.0.1:3852`, so only programs on the host can reach it, such as the reverse proxy above. [docker-compose.yaml](docker-compose.yaml) also has a commented-out Caddy service, if you'd rather run the reverse proxy in the same stack.
+- The container is named `tododav`, and port `3852` is published on every address so a fresh install can be checked from anywhere. Once the reverse proxy above is on the same machine, change it to `127.0.0.1:3852:3852` so only programs on the host can reach it. [docker-compose.yaml](docker-compose.yaml)
 - To update: `git pull`, then `docker compose up -d --build` again.
 
 Without Compose:

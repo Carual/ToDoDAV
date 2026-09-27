@@ -35,7 +35,7 @@ frontend-react/
   vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
 .env.example          Documented configuration
 Dockerfile            Builds with npm (node image), runs on Bun with only the production dependencies
-docker-compose.yaml   Example stack: ToDoDAV on 127.0.0.1:3852, optional Caddy commented out
+docker-compose.yaml   Example stack: container `tododav` on port 3852 (all addresses)
 ```
 
 ## Backend
