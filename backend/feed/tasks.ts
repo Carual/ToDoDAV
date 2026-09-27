@@ -49,10 +49,30 @@ export function tasksFeed(config: Config): Router {
       return;
     }
 
-    res.type('text/calendar; charset=utf-8').set('Cache-Control', 'no-cache').send(toEventCalendar(calendar));
+    res
+      .attachment(calendarFileName(calendar.name, req.path))
+      .type('text/calendar; charset=utf-8')
+      .set('Cache-Control', 'no-cache')
+      .send(toEventCalendar(calendar));
   });
 
   return router;
+}
+
+/**
+ * "<display name>.ics", or the calendar's last path segment when it has no name.
+ * Path separators and control characters are replaced so the name is always a plain file name.
+ */
+export function calendarFileName(name: string | undefined, path: string): string {
+  const segment = path.split('/').filter(Boolean).pop() ?? '';
+  let fallback: string;
+  try {
+    fallback = decodeURIComponent(segment);
+  } catch {
+    fallback = segment;
+  }
+  const base = (name || fallback || 'calendar').replace(/[\\/\u0000-\u001f\u007f]/g, '_');
+  return `${base}.ics`;
 }
 
 interface TaskList {

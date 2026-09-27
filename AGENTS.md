@@ -60,7 +60,7 @@ The backend does **not** serve the built frontend. In production, the reverse pr
 The one exception to "all logic lives in the browser". Google Calendar can subscribe to an `.ics` URL, but it fetches from Google's servers, cannot log in to CalDAV and ignores `VTODO`s. So the backend publishes read-only feeds, reading the CalDAV server with the credentials from env. Each feed is **off by default** (`FEED_TASKS_ENABLED`, `FEED_EVENTS_ENABLED`).
 
 - **Access.** `FEED_TOKEN` is required whenever a feed is enabled (startup fails without it). It is the first path segment (`/feed/tasks/<token>/juan/tasks/`), compared in constant time. A wrong token answers `404` after 1 second, so scanners cannot tell a feed exists. Dot segments (also percent-encoded ones) are refused, since the caller never proved it knows the password. Only `GET`/`HEAD`, and HTTPS in production like `/proxy`.
-- **`/feed/events/<path>`** is a plain proxy: `GET <CALDAV_URL><path>` with the env credentials. It relies on Radicale answering `GET` on a calendar collection with the whole calendar (not standard CalDAV). Only a `200 text/calendar` (or `304`) goes back, with just `Content-Type`, `Content-Length`, `ETag` and `Last-Modified`; anything else becomes `404`, so address books and other data on the same account never leave through it.
+- **`/feed/events/<path>`** is a plain proxy: `GET <CALDAV_URL><path>` with the env credentials. It relies on Radicale answering `GET` on a calendar collection with the whole calendar (not standard CalDAV). Only a `200 text/calendar` (or `304`) goes back, with just `Content-Type`, `Content-Length`, `ETag`, `Last-Modified` and `Content-Disposition` (Radicale names the file after the calendar; without one, the last path segment is used); anything else becomes `404`, so address books and other data on the same account never leave through it.
 - **`/feed/tasks/<path>`** reads one calendar (`PROPFIND` depth 0 must say it is a calendar, else `404`; then a `REPORT` for `VTODO`s) and converts each task. There is no `DOMParser` on the server, so `calendar-data`, `resourcetype` and `displayname` are pulled out with a prefix-agnostic regex instead of adding an XML dependency. The translation rules (in `toEvent`):
 
   | Task | Event |
@@ -76,7 +76,7 @@ The one exception to "all logic lives in the browser". Google Calendar can subsc
   | `DESCRIPTION`, `LOCATION`, `URL`, `UID`, `SEQUENCE`... | Kept |
   | `PRIORITY`, `CATEGORIES`, `X-` properties | Dropped; the title is just the task name |
 
-  Every event is `TRANSP:TRANSPARENT` (free, never blocks time). `X-WR-CALNAME` carries the list's display name. Times keep their `TZID`, and the needed `VTIMEZONE`s are copied once.
+  Every event is `TRANSP:TRANSPARENT` (free, never blocks time). `X-WR-CALNAME` carries the list's display name, and so does the file name (`Content-Disposition: attachment; filename="<name>.ics"`). Times keep their `TZID`, and the needed `VTIMEZONE`s are copied once.
 
 Google refreshes subscribed calendars on its own schedule (often 8–24 hours) and the feeds are one-way: nothing done in Google comes back.
 
