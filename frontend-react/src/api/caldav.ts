@@ -141,6 +141,16 @@ export class CalDavClient {
     return parseTask(task.href, response.headers.get('ETag') ?? '', ics);
   }
 
+  /** Stores a new task in a list. If-None-Match: * guarantees it never overwrites an existing one. */
+  async createTask(calendarHref: string, uid: string, ics: string): Promise<Task> {
+    const href = `${calendarHref.endsWith('/') ? calendarHref : `${calendarHref}/`}${encodeURIComponent(uid)}.ics`;
+    const response = await this.send('PUT', href, {
+      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' },
+      body: ics,
+    });
+    return parseTask(href, response.headers.get('ETag') ?? '', ics);
+  }
+
   private async propfind(href: string | null, depth: 0 | 1, props: string): Promise<DavResponse[]> {
     const response = await this.send('PROPFIND', href, {
       headers: { Depth: String(depth), 'Content-Type': XML },

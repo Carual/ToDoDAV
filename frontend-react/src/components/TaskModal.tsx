@@ -6,10 +6,11 @@ import { CloseIcon, FlagIcon, HashIcon } from './icons.tsx';
 import { TaskCheckbox } from './TaskItem.tsx';
 
 interface Props {
-  task: Task;
+  /** The task to show and edit; absent when adding a new one. */
+  task?: Task;
   calendar: Calendar;
   onClose: () => void;
-  onSave: (task: Task, edits: TaskEdits) => Promise<void>;
+  onSave: (edits: TaskEdits) => Promise<void>;
   onComplete: (task: Task) => void;
 }
 
@@ -17,7 +18,8 @@ const PRIORITIES: Priority[] = [1, 2, 3, 4];
 /** Time given to a date when "All day" is switched off. */
 const DEFAULT_TIME = '09:00';
 
-function initialEdits(task: Task): TaskEdits {
+function initialEdits(task: Task | undefined): TaskEdits {
+  if (!task) return { summary: '', description: '', priority: 4, categories: [] };
   return {
     summary: task.summary,
     description: task.description,
@@ -56,9 +58,10 @@ function problemWith(edits: TaskEdits): string | null {
 }
 
 export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props) {
+  const isNew = task === undefined;
   const [edits, setEdits] = useState(() => initialEdits(task));
-  const [allDay, setAllDay] = useState(() => !task.start?.time && !task.due?.time);
-  const [labelsText, setLabelsText] = useState(() => task.categories.join(', '));
+  const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
+  const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
@@ -84,7 +87,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
     setSaving(true);
     setError(null);
     try {
-      await onSave(task, finalEdits);
+      await onSave(finalEdits);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save the task.');
       setSaving(false);
@@ -112,7 +115,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="Task details">
+      <div className="modal" role="dialog" aria-modal="true" aria-label={isNew ? 'Add task' : 'Task details'}>
         <header className="modal-header">
           <span className="modal-crumb">
             <HashIcon style={{ color: calendar.color }} />
@@ -126,13 +129,18 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
         <div className="modal-content">
           <section className="modal-main">
             <div className="modal-title-row">
-              <TaskCheckbox
-                task={{ ...task, priority: edits.priority }}
-                onComplete={(completed) => {
-                  onComplete(completed);
-                  onClose();
-                }}
-              />
+              {task ? (
+                <TaskCheckbox
+                  task={{ ...task, priority: edits.priority }}
+                  onComplete={(completed) => {
+                    onComplete(completed);
+                    onClose();
+                  }}
+                />
+              ) : (
+                // Nothing to complete yet: just the circle, in the chosen priority color.
+                <span className={`task-check task-check-static p${edits.priority}`} aria-hidden="true" />
+              )}
               <div className="modal-editor">
                 <input
                   className="modal-title"
@@ -207,7 +215,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
               />
             </SidebarItem>
 
-            {hasDetails(task) && (
+            {task && hasDetails(task) && (
               <SidebarItem title="Details">
                 <dl className="details">
                   {task.status && <Detail term="Status">{task.status.toLowerCase().replace('-', ' ')}</Detail>}
@@ -240,8 +248,14 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!canSave} title="Save (Ctrl+Enter)">
-            {saving ? 'Saving…' : 'Save'}
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => void save()}
+            disabled={!canSave}
+            title={`${isNew ? 'Add task' : 'Save'} (Ctrl+Enter)`}
+          >
+            {saving ? (isNew ? 'Adding…' : 'Saving…') : isNew ? 'Add task' : 'Save'}
           </button>
         </footer>
       </div>

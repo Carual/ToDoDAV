@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalDavError } from '../api/caldav.ts';
-import { applyEdits, withCompleted, type Task, type TaskEdits } from '../api/tasks.ts';
-import { ChevronDownIcon, LogoMark } from './icons.tsx';
+import { applyEdits, newTaskIcs, withCompleted, type Task, type TaskEdits } from '../api/tasks.ts';
+import { ChevronDownIcon, LogoMark, PlusIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
@@ -52,6 +52,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openHref, setOpenHref] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const loadId = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -115,8 +116,32 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
     setOpenHref(null);
   }
 
+  async function createTask(edits: TaskEdits) {
+    if (!calendarHref) return;
+    const { uid, ics } = newTaskIcs(edits);
+    const created = await client.createTask(calendarHref, uid, ics);
+    if (created.etag) setTasks((current) => [...current, created]);
+    else void load(); // the server did not send the ETag: reload to get it
+    setCreating(false);
+  }
+
   const openTasks = tasks.filter((t) => !t.completed).sort(compareTasks);
   const openTask = tasks.find((t) => t.href === openHref);
+  const modalOpen = creating || openTask !== undefined;
+
+  // "Q" opens the new-task modal, like Todoist's quick add (not while typing or with a modal open).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      const typing = target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+      if (event.key.toLowerCase() !== 'q' || event.ctrlKey || event.metaKey || event.altKey || typing) return;
+      if (modalOpen || !calendar) return;
+      event.preventDefault();
+      setCreating(true);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modalOpen, calendar]);
 
   return (
     <div className="app">
@@ -176,34 +201,55 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
               </div>
             ) : loading && tasks.length === 0 ? (
               <p className="muted loading">Loading tasks…</p>
-            ) : openTasks.length === 0 ? (
-              <div className="empty">
-                <h2>All clear</h2>
-                <p>No open tasks in this list.</p>
-              </div>
             ) : (
-              <ul className="task-list">
-                {openTasks.map((task) => (
-                  <TaskItem
-                    key={task.href}
-                    task={task}
-                    onOpen={(t) => setOpenHref(t.href)}
-                    onComplete={(t) => void setCompleted(t, true)}
-                  />
-                ))}
-              </ul>
+              <>
+                {openTasks.length > 0 && (
+                  <ul className="task-list">
+                    {openTasks.map((task) => (
+                      <TaskItem
+                        key={task.href}
+                        task={task}
+                        onOpen={(t) => setOpenHref(t.href)}
+                        onComplete={(t) => void setCompleted(t, true)}
+                      />
+                    ))}
+                  </ul>
+                )}
+                <button type="button" className="add-task" onClick={() => setCreating(true)}>
+                  <span className="add-task-icon" aria-hidden="true">
+                    <PlusIcon />
+                  </span>
+                  Add task
+                </button>
+                {openTasks.length === 0 && (
+                  <div className="empty">
+                    <h2>All clear</h2>
+                    <p>No open tasks in this list.</p>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
       </main>
 
-      {openTask && calendar && (
+      {calendar && creating && (
+        <TaskModal
+          key="new"
+          calendar={calendar}
+          onClose={() => setCreating(false)}
+          onSave={createTask}
+          onComplete={(t) => void setCompleted(t, true)}
+        />
+      )}
+
+      {calendar && !creating && openTask && (
         <TaskModal
           key={`${openTask.href} ${openTask.etag}`}
           task={openTask}
           calendar={calendar}
           onClose={() => setOpenHref(null)}
-          onSave={saveEdits}
+          onSave={(edits) => saveEdits(openTask, edits)}
           onComplete={(t) => void setCompleted(t, true)}
         />
       )}

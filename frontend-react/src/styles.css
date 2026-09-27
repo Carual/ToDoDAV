@@ -481,6 +481,54 @@ button {
   opacity: 1;
 }
 
+/* The circle in the new-task modal: shows the priority color but does nothing. */
+.task-check-static {
+  cursor: default;
+}
+
+/* "+ Add task" row under the list, like Todoist: red plus, gray text; both turn red on hover. */
+.add-task {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--text-tertiary);
+  text-align: left;
+}
+
+.add-task-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--accent);
+  transition:
+    background-color 0.1s,
+    color 0.1s;
+}
+
+.add-task:hover,
+.add-task:focus-visible {
+  color: var(--accent);
+}
+
+.add-task:hover .add-task-icon,
+.add-task:focus-visible .add-task-icon {
+  background: var(--accent);
+  color: #fff;
+}
+
+.add-task:focus-visible {
+  outline: none;
+}
+
 /* ---------- Task modal ---------- */
 
 .modal-backdrop {

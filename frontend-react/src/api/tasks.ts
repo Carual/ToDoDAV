@@ -142,16 +142,14 @@ function setDate(vtodo: ICAL.Component, name: string, value: LocalDate | undefin
   );
 }
 
-/** Returns the task's iCalendar text with the edits applied; every other property is kept as it was. */
-export function applyEdits(task: Task, edits: TaskEdits): string {
-  const { vcalendar, vtodo } = parse(task.ics);
-
+/** Writes the editable fields into a VTODO. `previous` is the task as loaded (absent for a new task). */
+function writeEdits(vtodo: ICAL.Component, edits: TaskEdits, previous?: Task) {
   setText(vtodo, 'summary', edits.summary.trim());
   setText(vtodo, 'description', edits.description.trim());
 
   // Only rewrite a date when it changed, so an untouched one keeps its original time zone.
-  if (!sameDate(edits.start, task.start)) setDate(vtodo, 'dtstart', edits.start);
-  if (!sameDate(edits.due, task.due)) {
+  if (!sameDate(edits.start, previous?.start)) setDate(vtodo, 'dtstart', edits.start);
+  if (!sameDate(edits.due, previous?.due)) {
     vtodo.removeAllProperties('duration'); // DUE and DURATION cannot coexist
     setDate(vtodo, 'due', edits.due);
   }
@@ -165,9 +163,43 @@ export function applyEdits(task: Task, edits: TaskEdits): string {
     categories.setValues(edits.categories);
     vtodo.addProperty(categories);
   }
+}
 
+/** Returns the task's iCalendar text with the edits applied; every other property is kept as it was. */
+export function applyEdits(task: Task, edits: TaskEdits): string {
+  const { vcalendar, vtodo } = parse(task.ics);
+  writeEdits(vtodo, edits, task);
   touch(vtodo);
   return vcalendar.toString();
+}
+
+/** A random UUID. crypto.randomUUID only exists on HTTPS/localhost; getRandomValues works everywhere. */
+function newUid(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6]! & 0x0f) | 0x40; // version 4
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80; // RFC 4122 variant
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** iCalendar text for a brand-new open task, and the UID it was given. */
+export function newTaskIcs(edits: TaskEdits): { uid: string; ics: string } {
+  const uid = newUid();
+  const vcalendar = new ICAL.Component('vcalendar');
+  vcalendar.updatePropertyWithValue('version', '2.0');
+  vcalendar.updatePropertyWithValue('prodid', '-//ToDoDAV//EN');
+
+  const vtodo = new ICAL.Component('vtodo');
+  vcalendar.addSubcomponent(vtodo);
+  vtodo.updatePropertyWithValue('uid', uid);
+  vtodo.updatePropertyWithValue('dtstamp', nowUtc());
+  vtodo.updatePropertyWithValue('created', nowUtc());
+  vtodo.updatePropertyWithValue('last-modified', nowUtc());
+  vtodo.updatePropertyWithValue('status', 'NEEDS-ACTION');
+  writeEdits(vtodo, edits);
+
+  return { uid, ics: vcalendar.toString() };
 }
 
 /** Returns the task's iCalendar text marked as completed (or as open again). */

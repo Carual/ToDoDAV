@@ -69,6 +69,14 @@ export function HashIcon(props: IconProps) {
   );
 }
 
+export function PlusIcon(props: IconProps) {
+  return (
+    <svg {...base} width={13} height={13} viewBox="0 0 13 13" {...props}>
+      <path d="M6.5 1.5v10M1.5 6.5h10" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>
