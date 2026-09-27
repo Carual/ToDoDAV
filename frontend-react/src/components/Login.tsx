@@ -1,17 +1,20 @@
 import { useState, type FormEvent } from 'react';
-import { CalDavClient, type Calendar, type Credentials } from '../api/caldav.ts';
+import { CalDavClient, NO_FEEDS, type Calendar, type Credentials, type ServerConfig } from '../api/caldav.ts';
 import { LogoMark } from './icons.tsx';
 
 export interface Session {
   client: CalDavClient;
   calendars: Calendar[];
+  config: ServerConfig;
 }
 
 /** Logging in = asking the server for the user's task lists; it only works with the right credentials. */
 export async function logIn(credentials: Credentials): Promise<Session> {
   const client = new CalDavClient(credentials);
-  const calendars = await client.discoverCalendars();
-  return { client, calendars };
+  // The settings only add extras (feed links), so a backend or reverse proxy without /api/config
+  // must not block the login.
+  const [calendars, config] = await Promise.all([client.discoverCalendars(), client.serverConfig().catch(() => NO_FEEDS)]);
+  return { client, calendars, config };
 }
 
 export function Login({ onLogin }: { onLogin: (session: Session, credentials: Credentials) => void }) {

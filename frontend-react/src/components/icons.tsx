@@ -85,6 +85,16 @@ export function CloseIcon(props: IconProps) {
   );
 }
 
+/** Arrow leaving a box: share / publish. */
+export function ShareIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 4.5v10M8.5 8 12 4.5 15.5 8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 11H6.5v8.5h11V11H16" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>

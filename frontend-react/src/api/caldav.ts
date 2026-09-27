@@ -11,6 +11,18 @@ export interface Calendar {
   color?: string;
 }
 
+/** Settings of this ToDoDAV install, from the backend's /api/config. */
+export interface ServerConfig {
+  feeds: {
+    tasks: boolean;
+    events: boolean;
+    /** Present when at least one feed is enabled. */
+    token?: string;
+  };
+}
+
+export const NO_FEEDS: ServerConfig = { feeds: { tasks: false, events: false } };
+
 export class CalDavError extends Error {
   /** 0 means the server could not be reached. */
   readonly status: number;
@@ -151,6 +163,19 @@ export class CalDavClient {
     return parseTask(href, response.headers.get('ETag') ?? '', ics);
   }
 
+  /** The backend's settings. Not CalDAV, but it needs the same credentials as every /proxy request. */
+  async serverConfig(): Promise<ServerConfig> {
+    const response = await fetch(`${this.origin}/api/config`, { headers: { Authorization: this.authorization } });
+    if (!response.ok) throw new CalDavError(response.status, `The server answered ${response.status}.`);
+    return (await response.json()) as ServerConfig;
+  }
+
+  /** Server href (e.g. /juan/tasks/) -> path under the CalDAV root (juan/tasks/), as /proxy and /feed take it. */
+  relativePath(href: string): string {
+    const path = /^https?:\/\//.test(href) ? new URL(href).pathname : href;
+    return path.startsWith(this.basePath) ? path.slice(this.basePath.length) : path.replace(/^\//, '');
+  }
+
   private async propfind(href: string | null, depth: 0 | 1, props: string): Promise<DavResponse[]> {
     const response = await this.send('PROPFIND', href, {
       headers: { Depth: String(depth), 'Content-Type': XML },
@@ -164,9 +189,7 @@ export class CalDavClient {
   /** Server href (e.g. /juan/tasks/) -> proxy URL (/proxy/juan/tasks/). `null` is the proxy root. */
   private url(href: string | null): string {
     if (href === null) return `${this.origin}/proxy/`;
-    const path = /^https?:\/\//.test(href) ? new URL(href).pathname : href;
-    const relative = path.startsWith(this.basePath) ? path.slice(this.basePath.length) : path.replace(/^\//, '');
-    return `${this.origin}/proxy/${relative}`;
+    return `${this.origin}/proxy/${this.relativePath(href)}`;
   }
 
   private async send(

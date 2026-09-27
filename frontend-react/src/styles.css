@@ -308,6 +308,13 @@ button {
   overflow-wrap: anywhere;
 }
 
+.view-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .calendar-select {
   position: relative;
   display: inline-flex;
@@ -851,6 +858,71 @@ button {
   color: var(--p3);
 }
 
+/* ---------- Share modal ---------- */
+
+.modal-small {
+  max-width: 560px;
+}
+
+.share-body {
+  padding: 16px 20px 20px;
+  overflow: auto;
+}
+
+.share-body h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.share-body p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.share-link {
+  margin-top: 16px;
+}
+
+.share-link h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.share-link-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-soft);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  outline: none;
+}
+
+.share-link-row input:focus {
+  border-color: var(--text-tertiary);
+}
+
+.share-link-row .btn {
+  min-width: 72px;
+}
+
+.share-body .share-note {
+  margin-top: 20px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
@@ -900,6 +972,11 @@ button {
 
   .modal-content {
     flex-direction: column;
+  }
+
+  /* The share modal is short: no need to cover the whole screen. */
+  .modal-small {
+    height: auto;
   }
 
   .modal-sidebar {

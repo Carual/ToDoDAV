@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalDavError } from '../api/caldav.ts';
 import { applyEdits, newTaskIcs, withCompleted, type Task, type TaskEdits } from '../api/tasks.ts';
-import { ChevronDownIcon, LogoMark, PlusIcon } from './icons.tsx';
+import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
+import { ShareModal } from './ShareModal.tsx';
 import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
 
@@ -41,7 +42,8 @@ function compareTasks(a: Task, b: Task): number {
 }
 
 export function MainPage({ session, onLogout }: { session: Session; onLogout: () => void }) {
-  const { client, calendars } = session;
+  const { client, calendars, config } = session;
+  const canShare = config.feeds.tasks || config.feeds.events;
   const [calendarHref, setCalendarHref] = useState(() => {
     const saved = readSelected();
     return calendars.find((c) => c.href === saved)?.href ?? calendars[0]?.href;
@@ -53,6 +55,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
   const [loadError, setLoadError] = useState<string | null>(null);
   const [openHref, setOpenHref] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
   const loadId = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -127,7 +130,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
 
   const openTasks = tasks.filter((t) => !t.completed).sort(compareTasks);
   const openTask = tasks.find((t) => t.href === openHref);
-  const modalOpen = creating || openTask !== undefined;
+  const modalOpen = creating || sharing || openTask !== undefined;
 
   // "Q" opens the new-task modal, like Todoist's quick add (not while typing or with a modal open).
   useEffect(() => {
@@ -171,25 +174,38 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
           <>
             <div className="view-header">
               <h1>{calendar.name}</h1>
-              {calendars.length > 1 && (
-                <label className="calendar-select">
-                  <span className="visually-hidden">Task list</span>
-                  <select
-                    value={calendar.href}
-                    onChange={(e) => {
-                      setCalendarHref(e.target.value);
-                      saveSelected(e.target.value);
-                    }}
+              <div className="view-actions">
+                {canShare && (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Add to Google Calendar"
+                    title="Add to Google Calendar"
+                    onClick={() => setSharing(true)}
                   >
-                    {calendars.map((c) => (
-                      <option key={c.href} value={c.href}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDownIcon />
-                </label>
-              )}
+                    <ShareIcon />
+                  </button>
+                )}
+                {calendars.length > 1 && (
+                  <label className="calendar-select">
+                    <span className="visually-hidden">Task list</span>
+                    <select
+                      value={calendar.href}
+                      onChange={(e) => {
+                        setCalendarHref(e.target.value);
+                        saveSelected(e.target.value);
+                      }}
+                    >
+                      {calendars.map((c) => (
+                        <option key={c.href} value={c.href}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDownIcon />
+                  </label>
+                )}
+              </div>
             </div>
 
             {loadError ? (
@@ -252,6 +268,10 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
           onSave={(edits) => saveEdits(openTask, edits)}
           onComplete={(t) => void setCompleted(t, true)}
         />
+      )}
+
+      {calendar && sharing && (
+        <ShareModal client={client} calendar={calendar} feeds={config.feeds} onClose={() => setSharing(false)} />
       )}
 
       {toast && (

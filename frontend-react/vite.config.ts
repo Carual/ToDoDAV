@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
     },
     server: {
-      // Same origin as in production: /proxy goes to the backend (npm run dev:backend).
-      proxy: { '/proxy': `http://127.0.0.1:${PORT}` },
+      // Same origin as in production: /proxy, /api and /feed go to the backend (npm run dev:backend).
+      proxy: Object.fromEntries(['/proxy', '/api', '/feed'].map((path) => [path, `http://127.0.0.1:${PORT}`])),
     },
   };
 });

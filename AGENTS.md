@@ -20,15 +20,18 @@ The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository ro
 
 ```
 backend/
-  index.ts        Express app: status check, HTTPS guard, /proxy
-  auth.ts         Basic-auth credential check (constant-time, delayed 401)
+  index.ts        Express app: status check, HTTPS guard, /api/config, /proxy, /feed
+  auth.ts         Basic-auth credential check (constant-time, delayed 401); feed token and path check
   config.ts       Reads and validates env; fails fast listing every problem
+  feed/
+    tasks.ts      /feed/tasks: a task list as a calendar of events (VTODO -> VEVENT, ical.js)
+    events.ts     /feed/events: a calendar passed through as-is (http-proxy-middleware)
 frontend-react/
   src/api/caldav.ts   CalDAV client (plain fetch + DOMParser)
   src/api/tasks.ts    VTODO <-> Task model conversion (ical.js)
-  src/components/     Login, MainPage, TaskItem, TaskModal, icons
+  src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, icons
   src/format.ts       Due-date labels and date formatting
-  vite.config.ts      Dev server proxies /proxy to the backend; build goes to dist/frontend-react/
+  vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
 .env.example      Documented configuration
 ```
 
@@ -48,7 +51,34 @@ For `/proxy`, the backend does only five things:
 
 Security headers come from `helmet`, and the proxying itself from `http-proxy-middleware`.
 
-The backend does **not** serve the built frontend. In production, the reverse proxy serves `dist/frontend-react/` as static files and forwards `/proxy/*` to the backend, so both share one origin.
+`GET /api/config` tells the frontend what this install offers: `{"feeds":{"tasks":true,"events":false,"token":"..."}}` (`token` only when a feed is on). It has the same HTTPS and credential checks as `/proxy`, because it reveals the feed token, and is sent with `Cache-Control: no-store`. Keep it to settings the frontend needs; never the CalDAV credentials.
+
+The backend does **not** serve the built frontend. In production, the reverse proxy serves `dist/frontend-react/` as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, so they all share one origin.
+
+### Feeds (`/feed`)
+
+The one exception to "all logic lives in the browser". Google Calendar can subscribe to an `.ics` URL, but it fetches from Google's servers, cannot log in to CalDAV and ignores `VTODO`s. So the backend publishes read-only feeds, reading the CalDAV server with the credentials from env. Each feed is **off by default** (`FEED_TASKS_ENABLED`, `FEED_EVENTS_ENABLED`).
+
+- **Access.** `FEED_TOKEN` is required whenever a feed is enabled (startup fails without it). It is the first path segment (`/feed/tasks/<token>/juan/tasks/`), compared in constant time. A wrong token answers `404` after 1 second, so scanners cannot tell a feed exists. Dot segments (also percent-encoded ones) are refused, since the caller never proved it knows the password. Only `GET`/`HEAD`, and HTTPS in production like `/proxy`.
+- **`/feed/events/<path>`** is a plain proxy: `GET <CALDAV_URL><path>` with the env credentials. It relies on Radicale answering `GET` on a calendar collection with the whole calendar (not standard CalDAV). Only a `200 text/calendar` (or `304`) goes back, with just `Content-Type`, `Content-Length`, `ETag` and `Last-Modified`; anything else becomes `404`, so address books and other data on the same account never leave through it.
+- **`/feed/tasks/<path>`** reads one calendar (`PROPFIND` depth 0 must say it is a calendar, else `404`; then a `REPORT` for `VTODO`s) and converts each task. There is no `DOMParser` on the server, so `calendar-data`, `resourcetype` and `displayname` are pulled out with a prefix-agnostic regex instead of adding an XML dependency. The translation rules (in `toEvent`):
+
+  | Task | Event |
+  | --- | --- |
+  | No due date (`DUE`, or `DTSTART` + `DURATION`) | Left out |
+  | Cancelled | Left out (an override of a repeating task stays as a cancelled occurrence) |
+  | Completed | Kept, title prefixed with `✓ ` |
+  | `DTSTART` before `DUE`, same value type | Spans start → due |
+  | Otherwise | On the due date only |
+  | Timed | An instant: `DTEND` = `DTSTART` |
+  | All-day | `DTEND` is the next day (exclusive) |
+  | `RRULE`, `RDATE`, `EXDATE`, `RECURRENCE-ID`, `VALARM` | Kept |
+  | `DESCRIPTION`, `LOCATION`, `URL`, `UID`, `SEQUENCE`... | Kept |
+  | `PRIORITY`, `CATEGORIES`, `X-` properties | Dropped; the title is just the task name |
+
+  Every event is `TRANSP:TRANSPARENT` (free, never blocks time). `X-WR-CALNAME` carries the list's display name. Times keep their `TZID`, and the needed `VTIMEZONE`s are copied once.
+
+Google refreshes subscribed calendars on its own schedule (often 8–24 hours) and the feeds are one-way: nothing done in Google comes back.
 
 ### Configuration
 
@@ -62,6 +92,9 @@ See [.env.example](.env.example). `config.ts` validates everything at startup an
 | `CALDAV_PASSWORD` | Required. |
 | `HOST` | Default `0.0.0.0`. Use `127.0.0.1` when the reverse proxy is on the same machine. |
 | `PORT` | Default `3000`. Also read by the Vite dev server so `/proxy` stays in sync. |
+| `FEED_TASKS_ENABLED` | `true` or `false` (default). Mounts `/feed/tasks`. |
+| `FEED_EVENTS_ENABLED` | `true` or `false` (default). Mounts `/feed/events`. |
+| `FEED_TOKEN` | Required when a feed is enabled. At least 32 characters of `A-Z a-z 0-9 - _`. |
 
 ## Frontend (`frontend-react/`)
 
@@ -72,6 +105,7 @@ A React + Vite app that looks and behaves like Todoist:
 - **Task rows:** a round checkbox colored by priority completes the task (with Undo). Rows show the description, a color-coded due date and labels, plus an edit button on hover.
 - **Add task:** the "+ Add task" row under the list (or the **Q** key) opens the same modal empty; its footer button says "Add task". New tasks get a random UID and are written with `If-None-Match: *`, so they can never overwrite an existing one.
 - **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires `DTSTART` and `DUE` to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves.
+- **Share button:** next to the list selector, only when `/api/config` reports a feed. It opens a modal with the current list's feed links (`<origin>/feed/<tasks|events>/<token>/<list path>`) and a Copy button each, for Google Calendar's "From URL". `/api/config` is fetched at login; if it fails, the login still works and the button stays hidden.
 
 `src/api/caldav.ts` is the CalDAV client (plain `fetch` + `DOMParser`), and `src/api/tasks.ts` converts between iCalendar `VTODO` and the task model using `ical.js`.
 
@@ -81,7 +115,7 @@ A React + Vite app that looks and behaves like Todoist:
 - **Preserve what other apps wrote.** Edits go through `applyEdits`, which only touches the fields the modal owns. Reminders (`VALARM`), repeat rules (`RRULE`) and any unknown properties set by other CalDAV clients are kept.
 - **Optimistic concurrency with ETags.** Updates send `If-Match` with the task's ETag. If the task changed elsewhere in the meantime, the server refuses the save and the list reloads instead of overwriting.
 - **Never clobber on create.** New tasks use `If-None-Match: *`.
-- **Same origin in dev and prod.** Vite's dev server proxies `/proxy` to the backend, mirroring the production reverse proxy, so the frontend always calls relative `/proxy/...` URLs.
+- **Same origin in dev and prod.** Vite's dev server proxies `/proxy`, `/api` and `/feed` to the backend, mirroring the production reverse proxy, so the frontend always calls relative URLs (and feed links built from `window.location.origin` work in dev too).
 
 ### Not implemented yet
 
@@ -121,5 +155,6 @@ Run `npm run typecheck` after changes; there is no test suite yet.
 
 - **Run with `NODE_ENV=production` when deploying.** If it's missing, ToDoDAV runs in development mode and accepts plain HTTP. Basic auth sends the password with every request, so development mode must never face the internet.
 - **Use a dedicated or app-specific password** for ToDoDAV.
-- **The path in `CALDAV_URL` is not a boundary.** A client could use `..` to reach other paths on the same CalDAV host, always with these same credentials. The CalDAV server's own permissions still apply.
+- **The path in `CALDAV_URL` is not a boundary.** A client could use `..` to reach other paths on the same CalDAV host, always with these same credentials. The CalDAV server's own permissions still apply. (The feeds refuse `..`, because their callers have no password.)
+- **The feed token is the only lock on the feeds.** Anyone with the URL can read every calendar those credentials can read, through that feed. Keep it secret, and change `FEED_TOKEN` to revoke old URLs.
 - **Keep the password out of `localStorage`.** The frontend has to keep it in the browser in order to send it, so prefer memory or `sessionStorage`. Any XSS would expose it.

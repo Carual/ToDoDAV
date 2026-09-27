@@ -2,8 +2,10 @@ import express, { type RequestHandler } from 'express';
 import helmet from 'helmet';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import type { AddressInfo } from 'node:net';
-import { requireCredentials } from './auth.ts';
+import { requireCredentials, requireFeedAccess } from './auth.ts';
 import { loadConfig } from './config.ts';
+import { eventsFeed } from './feed/events.ts';
+import { tasksFeed } from './feed/tasks.ts';
 
 const config = loadConfig();
 const app = express();
@@ -27,12 +29,21 @@ const requireHttps: RequestHandler = (req, res, next) => {
   res.status(403).json({ error: 'https_required' });
 };
 
+const requireLogin = requireCredentials(config.username, config.password);
+
+// What the frontend needs to know about this install. Behind the same checks as /proxy because it
+// reveals the feed token; no-store so it is not kept in any cache.
+app.get('/api/config', requireHttps, requireLogin, (_req, res) => {
+  const { tasks, events, token } = config.feeds;
+  res.set('Cache-Control', 'no-store').json({ feeds: { tasks, events, token: tasks || events ? token : undefined } });
+});
+
 // Everything under /proxy goes to the CalDAV server from env: /proxy/juan/tasks/ -> CALDAV_URL + juan/tasks/.
 // The host always comes from CALDAV_URL; the client only chooses the path.
 app.use(
   '/proxy',
   requireHttps,
-  requireCredentials(config.username, config.password),
+  requireLogin,
   createProxyMiddleware({
     target: config.caldavUrl.href,
     changeOrigin: true,
@@ -57,13 +68,22 @@ app.use(
   }),
 );
 
+// Read-only .ics feeds for calendar apps that cannot log in to CalDAV (Google Calendar's "From URL").
+// They read the CalDAV server with the credentials from env, so the token in their URL is what guards them.
+// Off unless enabled, so no install publishes anything by accident.
+const feedAccess = requireFeedAccess(config.feeds.token);
+if (config.feeds.tasks) app.use('/feed/tasks', requireHttps, feedAccess, tasksFeed(config));
+if (config.feeds.events) app.use('/feed/events', requireHttps, feedAccess, eventsFeed(config));
+
 const server = app.listen(config.port, config.host, (error) => {
   if (error) throw error;
   const { port } = server.address() as AddressInfo;
   console.log(`ToDoDAV listening on http://${config.host}:${port}, proxying /proxy to ${config.caldavUrl.href}`);
   if (config.production) {
-    console.log('Production mode: /proxy only accepts HTTPS requests (via the reverse proxy).');
+    console.log('Production mode: /proxy and /feed only accept HTTPS requests (via the reverse proxy).');
   } else {
     console.warn('Development mode: plain HTTP is accepted. Set NODE_ENV=production when deploying.');
   }
+  const feeds = [config.feeds.tasks && '/feed/tasks', config.feeds.events && '/feed/events'].filter(Boolean);
+  if (feeds.length > 0) console.log(`Feeds enabled: ${feeds.join(', ')}`);
 });
