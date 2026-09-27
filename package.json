@@ -9,20 +9,31 @@
     "node": ">=22.18"
   },
   "scripts": {
+    "dev": "concurrently --names backend,frontend --prefix-colors blue,magenta --kill-others-on-fail \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "bun --watch backend/index.ts",
     "dev:backend:node": "node --watch --env-file-if-exists=.env backend/index.ts",
     "start": "bun backend/index.ts",
     "start:node": "node --env-file-if-exists=.env backend/index.ts",
-    "typecheck": "tsc --noEmit"
+    "dev:frontend": "vite --config frontend-react/vite.config.ts",
+    "build:frontend": "vite build --config frontend-react/vite.config.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p frontend-react"
   },
   "dependencies": {
     "express": "^5.2.1",
     "helmet": "^8.3.0",
-    "http-proxy-middleware": "^4.2.0"
+    "http-proxy-middleware": "^4.2.0",
+    "ical.js": "^2.2.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.3",
-    "typescript": "^7.0.2"
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
   }
 }

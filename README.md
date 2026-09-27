@@ -7,7 +7,7 @@ browser (frontend: all the logic)  ──►  backend: /proxy/*  ──►  your
                                         credential check         (CALDAV_URL in env)
 ```
 
-- **`frontend/`**: the app (not started yet). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`.
+- **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`.
 - **`backend/`**: a minimal Express proxy. It exists only because browsers cannot talk to most CalDAV servers directly. It stores nothing.
 
 The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository root. npm manages dependencies. Bun is the primary runtime, and Node works too. Both run the TypeScript directly, with no build step.
@@ -44,6 +44,34 @@ npm run typecheck
 ```
 
 Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`.
+
+## Frontend (`frontend-react/`)
+
+A React + Vite app that looks and behaves like Todoist:
+
+- **Login:** asks the server for your task lists (a CalDAV PROPFIND), which only works with the right username and password. The credentials stay in `sessionStorage`, so they survive a reload but disappear when the tab closes.
+- **Main page:** the current list's name as the title, with a selector when there is more than one list (only calendars that support tasks are shown). Open tasks are sorted by due date, then by priority.
+- **Task rows:** a round checkbox colored by priority completes the task (with Undo). Rows show the description, a color-coded due date and labels, plus an edit button on hover.
+- **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires DTSTART and DUE to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves. Saving only changes those fields, so reminders, repeat rules and anything else set by other apps are kept. If the task changed elsewhere in the meantime, the save is refused and the list reloads.
+
+`src/api/caldav.ts` is the CalDAV client (plain `fetch` + `DOMParser`), and `src/api/tasks.ts` converts between iCalendar `VTODO` and the task model using `ical.js`.
+
+### Development
+
+```sh
+npm run dev             # starts both below with concurrently; if one crashes, the other stops too
+```
+
+Or separately, in two terminals:
+
+```sh
+npm run dev:backend     # the proxy on :3000 (reads .env)
+npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to the backend
+```
+
+Vite reads the same `PORT` as the backend (from `.env`), so changing it keeps both in sync.
+
+`npm run build:frontend` builds the app into `dist/frontend-react/`.
 
 ## Security notes
 

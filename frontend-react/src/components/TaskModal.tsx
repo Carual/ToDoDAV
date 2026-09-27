@@ -1,0 +1,325 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Calendar } from '../api/caldav.ts';
+import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } from '../api/tasks.ts';
+import { describeDue, formatDateTime } from '../format.ts';
+import { CloseIcon, FlagIcon, HashIcon } from './icons.tsx';
+import { TaskCheckbox } from './TaskItem.tsx';
+
+interface Props {
+  task: Task;
+  calendar: Calendar;
+  onClose: () => void;
+  onSave: (task: Task, edits: TaskEdits) => Promise<void>;
+  onComplete: (task: Task) => void;
+}
+
+const PRIORITIES: Priority[] = [1, 2, 3, 4];
+/** Time given to a date when "All day" is switched off. */
+const DEFAULT_TIME = '09:00';
+
+function initialEdits(task: Task): TaskEdits {
+  return {
+    summary: task.summary,
+    description: task.description,
+    start: task.start,
+    due: task.due,
+    priority: task.priority,
+    categories: task.categories,
+  };
+}
+
+function sameEdits(a: TaskEdits, b: TaskEdits): boolean {
+  return (
+    a.summary === b.summary &&
+    a.description === b.description &&
+    sameDate(a.start, b.start) &&
+    sameDate(a.due, b.due) &&
+    a.priority === b.priority &&
+    a.categories.join('\n') === b.categories.join('\n')
+  );
+}
+
+/** All-day dates carry no time; timed dates always carry one. */
+function inMode(date: LocalDate | undefined, allDay: boolean): LocalDate | undefined {
+  if (!date) return undefined;
+  return allDay ? { date: date.date } : { date: date.date, time: date.time ?? DEFAULT_TIME };
+}
+
+const sortKey = (date: LocalDate) => `${date.date}T${date.time ?? '00:00'}`;
+
+function problemWith(edits: TaskEdits): string | null {
+  if (!edits.summary.trim()) return 'The task needs a name.';
+  if (edits.start && edits.due && sortKey(edits.start) > sortKey(edits.due)) {
+    return 'The start date must be before the due date.';
+  }
+  return null;
+}
+
+export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props) {
+  const [edits, setEdits] = useState(() => initialEdits(task));
+  const [allDay, setAllDay] = useState(() => !task.start?.time && !task.due?.time);
+  const [labelsText, setLabelsText] = useState(() => task.categories.join(', '));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
+  const dirty = !sameEdits(edits, initialEdits(task));
+  // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type).
+  const finalEdits: TaskEdits = { ...edits, start: inMode(edits.start, allDay), due: inMode(edits.due, allDay) };
+  const problem = problemWith(finalEdits);
+  const canSave = dirty && !problem && !saving;
+
+  function toggleAllDay(next: boolean) {
+    setAllDay(next);
+    update({ start: inMode(edits.start, next), due: inMode(edits.due, next) });
+  }
+
+  function requestClose() {
+    if (!dirty || window.confirm('Discard your changes?')) onClose();
+  }
+
+  async function save() {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(task, finalEdits);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save the task.');
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') requestClose();
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void save();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // Grow the description box with its content, like Todoist.
+  useEffect(() => {
+    const textarea = descriptionRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [edits.description]);
+
+  const message = error ?? (dirty ? problem : null);
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Task details">
+        <header className="modal-header">
+          <span className="modal-crumb">
+            <HashIcon style={{ color: calendar.color }} />
+            {calendar.name}
+          </span>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={requestClose}>
+            <CloseIcon />
+          </button>
+        </header>
+
+        <div className="modal-content">
+          <section className="modal-main">
+            <div className="modal-title-row">
+              <TaskCheckbox
+                task={{ ...task, priority: edits.priority }}
+                onComplete={(completed) => {
+                  onComplete(completed);
+                  onClose();
+                }}
+              />
+              <div className="modal-editor">
+                <input
+                  className="modal-title"
+                  value={edits.summary}
+                  onChange={(e) => update({ summary: e.target.value })}
+                  placeholder="Task name"
+                  aria-label="Task name"
+                  autoFocus
+                />
+                <textarea
+                  ref={descriptionRef}
+                  className="modal-description"
+                  value={edits.description}
+                  onChange={(e) => update({ description: e.target.value })}
+                  placeholder="Description"
+                  aria-label="Description"
+                  rows={1}
+                />
+              </div>
+            </div>
+          </section>
+
+          <aside className="modal-sidebar">
+            <SidebarItem title="Project">
+              <span className="sidebar-value">
+                <HashIcon style={{ color: calendar.color }} />
+                {calendar.name}
+              </span>
+            </SidebarItem>
+
+            <SidebarItem
+              title="Dates"
+              action={
+                <label className="switch">
+                  <input type="checkbox" checked={allDay} onChange={(e) => toggleAllDay(e.target.checked)} />
+                  <span className="switch-track" aria-hidden="true" />
+                  All day
+                </label>
+              }
+            >
+              <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => update({ start })} />
+              <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => update({ due })} />
+            </SidebarItem>
+
+            <SidebarItem title="Priority">
+              <label className={`priority-select p${edits.priority}`}>
+                <FlagIcon />
+                <select
+                  value={edits.priority}
+                  onChange={(e) => update({ priority: Number(e.target.value) as Priority })}
+                  aria-label="Priority"
+                >
+                  {PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      Priority {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </SidebarItem>
+
+            <SidebarItem title="Labels">
+              <input
+                className="sidebar-text"
+                value={labelsText}
+                onChange={(e) => {
+                  setLabelsText(e.target.value);
+                  update({ categories: e.target.value.split(',').map((l) => l.trim()).filter(Boolean) });
+                }}
+                placeholder="Comma separated"
+                aria-label="Labels"
+              />
+            </SidebarItem>
+
+            {hasDetails(task) && (
+              <SidebarItem title="Details">
+                <dl className="details">
+                  {task.status && <Detail term="Status">{task.status.toLowerCase().replace('-', ' ')}</Detail>}
+                  {task.percentComplete !== undefined && <Detail term="Progress">{task.percentComplete}%</Detail>}
+                  {task.location && <Detail term="Location">{task.location}</Detail>}
+                  {task.url && (
+                    <Detail term="Link">
+                      {/* Only http(s) becomes a link: a task could carry a javascript: URL. */}
+                      {/^https?:\/\//i.test(task.url) ? (
+                        <a href={task.url} target="_blank" rel="noreferrer noopener">
+                          {task.url}
+                        </a>
+                      ) : (
+                        task.url
+                      )}
+                    </Detail>
+                  )}
+                  {task.created && <Detail term="Created">{formatDateTime(task.created)}</Detail>}
+                  {task.lastModified && <Detail term="Modified">{formatDateTime(task.lastModified)}</Detail>}
+                </dl>
+              </SidebarItem>
+            )}
+          </aside>
+        </div>
+
+        <footer className="modal-footer">
+          <span className="modal-footer-message" role="alert">
+            {message}
+          </span>
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={!canSave} title="Save (Ctrl+Enter)">
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+interface DateFieldProps {
+  label: string;
+  value: LocalDate | undefined;
+  allDay: boolean;
+  /** Color the summary by urgency (overdue, today...), as for due dates. */
+  colored?: boolean;
+  onChange: (value: LocalDate | undefined) => void;
+}
+
+function DateField({ label, value, allDay, colored = false, onChange }: DateFieldProps) {
+  const summary = value && describeDue(value);
+  return (
+    <div className="date-field">
+      <span className="date-field-label">{label}</span>
+      <div className="date-field-row">
+        {allDay ? (
+          <input
+            type="date"
+            value={value?.date ?? ''}
+            onChange={(e) => onChange(e.target.value ? { date: e.target.value } : undefined)}
+            aria-label={label}
+          />
+        ) : (
+          <input
+            type="datetime-local"
+            value={value ? `${value.date}T${value.time ?? DEFAULT_TIME}` : ''}
+            onChange={(e) => {
+              const [date, time] = e.target.value.split('T');
+              onChange(date ? { date, time: time?.slice(0, 5) || DEFAULT_TIME } : undefined);
+            }}
+            aria-label={label}
+          />
+        )}
+        {value && (
+          <button
+            type="button"
+            className="icon-btn icon-btn-small"
+            aria-label={`Remove ${label.toLowerCase()}`}
+            title="Remove"
+            onClick={() => onChange(undefined)}
+          >
+            <CloseIcon />
+          </button>
+        )}
+      </div>
+      {summary && <span className={`due due-${colored ? summary.tone : 'later'} sidebar-note`}>{summary.label}</span>}
+    </div>
+  );
+}
+
+function hasDetails(task: Task): boolean {
+  return Boolean(task.status || task.percentComplete !== undefined || task.location || task.url || task.created || task.lastModified);
+}
+
+function SidebarItem({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="sidebar-item">
+      <div className="sidebar-item-header">
+        <h3>{title}</h3>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Detail({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <>
+      <dt>{term}</dt>
+      <dd>{children}</dd>
+    </>
+  );
+}
