@@ -34,6 +34,7 @@ frontend-react/
   src/router.ts       Tiny History-API router: /login, /tasks, /tasks/<uid>
   vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
 .env.example      Documented configuration
+Dockerfile        Builds with npm (node image), runs on Bun with only the production dependencies
 ```
 
 ## Backend

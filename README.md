@@ -83,6 +83,20 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
    If you'd rather have the reverse proxy serve the static files itself, point it at `dist/frontend-react/`, forward `/proxy/*`, `/api/*` and `/feed/*` to ToDoDAV, and answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
+### With Docker
+
+The [Dockerfile](Dockerfile) builds the app and runs it on Bun, with `NODE_ENV=production` already set and a health check on `/api/status`. Nothing needs to be installed on the host besides Docker.
+
+```sh
+docker build -t tododav .
+docker run -d --name tododav --restart unless-stopped --env-file .env -p 127.0.0.1:3000:3000 tododav
+```
+
+- In `.env`, set `NODE_ENV=production` (or remove the line) and leave `HOST` unset: inside the container ToDoDAV must listen on `0.0.0.0`.
+- `-p 127.0.0.1:3000:3000` only lets programs on the host reach it, such as the reverse proxy above. If the reverse proxy runs in Docker too, put both on the same network and drop `-p`, then point the proxy at `tododav:3000`.
+- Docker's `--env-file` takes values literally: don't wrap them in quotes.
+- To update: `git pull`, then build and run again (`docker rm -f tododav` first).
+
 ## Calendar feeds (Google Calendar)
 
 Google Calendar can't log in to CalDAV and ignores tasks, so ToDoDAV can publish read-only `.ics` feeds for it. Both are off by default:
