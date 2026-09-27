@@ -1,82 +1,98 @@
 # ToDoDAV
 
-Self-hosted, Todoist-style task manager on top of any CalDAV server (built against Radicale).
+**A Todoist-style task manager for your own CalDAV server.**
+
+You already host your calendars and tasks on a CalDAV server (Radicale, Nextcloud, Baïkal...), but the web UIs for tasks are either missing or clunky. ToDoDAV gives you a clean, fast, Todoist-like interface on top of the tasks you already have, without moving them anywhere.
+
+- **Your data stays where it is.** Tasks are plain iCalendar `VTODO`s on your CalDAV server. ToDoDAV has no database and stores nothing.
+- **Plays nicely with your other apps.** Keep using Thunderbird, Tasks.org (via DAVx⁵), or any other CalDAV client side by side. When you edit a task, ToDoDAV only changes the fields you touched, so reminders, repeat rules and anything else set by other apps are kept.
+- **No lost edits.** If a task was changed on another device while you were editing it, ToDoDAV refuses to overwrite it and reloads the list instead.
+- **Tiny to run.** One small Node/Bun process plus static files. Built and tested against Radicale.
+
+> **Status:** early (v0.1). Usable day to day for viewing, adding, editing and completing tasks. Deleting tasks and moving them between lists are not there yet.
+
+## Features
+
+- Log in with your CalDAV username and password.
+- Switch between your task lists (only calendars that support tasks are shown).
+- Open tasks sorted by due date, then priority, with color-coded due dates and labels.
+- Complete a task with one click, with Undo.
+- Add tasks with the "+ Add task" row or the **Q** key.
+- Edit title, description, start date, due date (all-day or with a time), priority and labels. Ctrl/⌘+Enter saves.
+
+## How it works
+
+Browsers can't talk to most CalDAV servers directly, so ToDoDAV ships a very small backend that sits between them:
 
 ```
-browser (frontend: all the logic)  ──►  backend: /proxy/*  ──►  your CalDAV server
-                                        credential check         (CALDAV_URL in env)
+browser (the app)  ──►  ToDoDAV backend (/proxy)  ──►  your CalDAV server
 ```
 
-- **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`.
-- **`backend/`**: a minimal Express proxy. It exists only because browsers cannot talk to most CalDAV servers directly. It stores nothing.
+The app in your browser does all the work and speaks CalDAV itself. The backend only checks your credentials and forwards requests to the one CalDAV server you configured. One ToDoDAV instance serves one CalDAV account.
 
-The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository root. npm manages dependencies. Bun is the primary runtime, and Node works too. Both run the TypeScript directly, with no build step.
+## Requirements
 
-## Backend
+- A CalDAV server with task (`VTODO`) support.
+- [Bun](https://bun.sh) ≥ 1.4 or Node.js ≥ 22.18.
+- A reverse proxy with HTTPS (Caddy, Traefik, nginx...) for anything reachable from outside your machine.
 
-Everything under `/proxy` is forwarded to `CALDAV_URL`. For example, `PROPFIND /proxy/juan/tasks/` becomes `PROPFIND <CALDAV_URL>juan/tasks/`. The request's method, headers and body are sent as-is, and the CalDAV server decides what is allowed.
-
-`GET /` is a status check that answers `{"status":"ok"}`, even over plain HTTP, so a fresh install can be checked from anywhere. ToDoDAV listens on `0.0.0.0` by default.
-
-For `/proxy`, the backend does only five things:
-
-1. **HTTPS only in production.** When `NODE_ENV=production`, `/proxy` requests that did not arrive over HTTPS get `403`, and `CALDAV_URL` must be `https://`. ToDoDAV itself speaks plain HTTP behind a TLS reverse proxy (Caddy, Traefik, nginx/openresty), which must *overwrite* `X-Forwarded-Proto` (nginx/openresty: `proxy_set_header X-Forwarded-Proto $scheme;`). The header is only trusted from loopback and private-network addresses.
-2. **Credential check.** The `Authorization: Basic ...` header must match `CALDAV_USERNAME` / `CALDAV_PASSWORD`. Otherwise it answers `401` after a 1-second delay, which slows down password guessing, and the CalDAV server is never contacted.
-3. **Fixed host.** Requests always go to the host in `CALDAV_URL`. The client only chooses the path.
-4. **MOVE destination.** The client sends the destination as an app URL (`https://app/proxy/juan/work/a.ics`), and the backend rewrites it to the CalDAV server's path (`/juan/work/a.ics`). The path has no host because, behind a reverse proxy, CalDAV servers often cannot recognize their own public host and reject the MOVE.
-5. **No login popup.** The `WWW-Authenticate` header is removed from responses, so the browser never shows its native login prompt.
-
-Security headers come from `helmet`, and the proxying itself from `http-proxy-middleware`.
-
-### Configuration
-
-See [.env.example](.env.example): `CALDAV_URL`, `CALDAV_USERNAME`, `CALDAV_PASSWORD`, and optionally `HOST` and `PORT`.
-
-### Development
-
-Requires Bun ≥ 1.4 (older Bun versions lowercase methods such as `PROPFIND`, which breaks CalDAV) or Node ≥ 22.18.
+## Try it locally
 
 ```sh
+git clone <this repo> tododav && cd tododav
 npm install
-cp .env.example .env    # then edit it
-npm run dev:backend     # runs on Bun: http://localhost:3000, restarts on changes
-npm run typecheck
+cp .env.example .env    # set CALDAV_URL, CALDAV_USERNAME, CALDAV_PASSWORD
+npm run dev
 ```
 
-Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`.
+Open http://localhost:5173 and log in with the same username and password you put in `.env`.
 
-## Frontend (`frontend-react/`)
+## Deploying
 
-A React + Vite app that looks and behaves like Todoist:
+1. **Build the web app** into `dist/frontend-react/`:
 
-- **Login:** asks the server for your task lists (a CalDAV PROPFIND), which only works with the right username and password. The credentials stay in `sessionStorage`, so they survive a reload but disappear when the tab closes.
-- **Main page:** the current list's name as the title, with a selector when there is more than one list (only calendars that support tasks are shown). Open tasks are sorted by due date, then by priority.
-- **Task rows:** a round checkbox colored by priority completes the task (with Undo). Rows show the description, a color-coded due date and labels, plus an edit button on hover.
-- **Add task:** the "+ Add task" row under the list (or the **Q** key) opens the same modal empty; its footer button says "Add task". New tasks get a random UID and are written with `If-None-Match: *`, so they can never overwrite an existing one.
-- **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires DTSTART and DUE to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves. Saving only changes those fields, so reminders, repeat rules and anything else set by other apps are kept. If the task changed elsewhere in the meantime, the save is refused and the list reloads.
+   ```sh
+   npm install
+   npm run build:frontend
+   ```
 
-`src/api/caldav.ts` is the CalDAV client (plain `fetch` + `DOMParser`), and `src/api/tasks.ts` converts between iCalendar `VTODO` and the task model using `ical.js`.
+2. **Configure** `.env` (see [.env.example](.env.example)):
 
-### Development
+   | Variable | What it does |
+   | --- | --- |
+   | `NODE_ENV` | Set to `production`. Required when deploying: it enforces HTTPS. |
+   | `CALDAV_URL` | Your CalDAV server, e.g. `https://dav.example.com/`. Must be `https://` in production. |
+   | `CALDAV_USERNAME` | Your CalDAV username. |
+   | `CALDAV_PASSWORD` | Your CalDAV password (ideally an app-specific one). |
+   | `HOST` | Default `0.0.0.0`. Use `127.0.0.1` if the reverse proxy runs on the same machine. |
+   | `PORT` | Default `3000`. |
 
-```sh
-npm run dev             # starts both below with concurrently; if one crashes, the other stops too
-```
+3. **Start the backend**: `npm start` (Bun) or `npm run start:node` (Node). Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /` answers `{"status":"ok"}` so you can health-check it.
 
-Or separately, in two terminals:
+4. **Put it behind your reverse proxy.** The proxy serves the built app as static files and forwards `/proxy/*` to the backend, all on one domain. For example, with Caddy:
 
-```sh
-npm run dev:backend     # the proxy on :3000 (reads .env)
-npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to the backend
-```
+   ```caddy
+   tasks.example.com {
+       handle /proxy/* {
+           reverse_proxy 127.0.0.1:3000
+       }
+       handle {
+           root * /path/to/tododav/dist/frontend-react
+           file_server
+       }
+   }
+   ```
 
-Vite reads the same `PORT` as the backend (from `.env`), so changing it keeps both in sync.
+   With nginx/openresty, make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without it, requests are rejected with `403`.
 
-`npm run build:frontend` builds the app into `dist/frontend-react/`.
+## Security
 
-## Security notes
+- **Always deploy with `NODE_ENV=production`.** Without it, ToDoDAV accepts plain HTTP, and your password travels with every request.
+- **Use a dedicated or app-specific password** if your CalDAV server supports them.
+- Wrong passwords get a 1-second delay before the `401`, and the CalDAV server is never contacted for them.
+- Your password is kept in the browser's `sessionStorage` while you're logged in, and is gone when you close the tab.
+- The backend only ever talks to the host in `CALDAV_URL`. The path in it is not a hard boundary, though: your CalDAV server's own permissions are what protect other paths on that host.
 
-- **Run with `NODE_ENV=production` when deploying.** If it's missing, ToDoDAV runs in development mode and accepts plain HTTP. Basic auth sends the password with every request, so development mode must never face the internet.
-- **Use a dedicated or app-specific password** for ToDoDAV.
-- **The path in `CALDAV_URL` is not a boundary.** A client could use `..` to reach other paths on the same CalDAV host, always with these same credentials. The CalDAV server's own permissions still apply.
-- **Keep the password out of `localStorage`.** The frontend has to keep it in the browser in order to send it, so prefer memory or `sessionStorage`. Any XSS would expose it.
+## Contributing
+
+Architecture, design decisions and development notes live in [AGENTS.md](AGENTS.md).
