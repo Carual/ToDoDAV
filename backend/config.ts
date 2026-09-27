@@ -40,7 +40,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   if (username.includes(':')) problems.push('CALDAV_USERNAME must not contain ":"');
   if (!password) problems.push('CALDAV_PASSWORD is required');
 
-  const port = Number(env.PORT ?? 3000);
+  const port = Number(env.PORT ?? 3852);
   if (!Number.isInteger(port) || port < 0 || port > 65535) problems.push('PORT must be a valid port number');
 
   const flag = (name: string): boolean => {

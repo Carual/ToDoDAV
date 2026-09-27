@@ -7,7 +7,7 @@ const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 export default defineConfig(({ mode }) => {
   // Same PORT as the backend (root .env or environment), so /proxy always reaches it.
   // Only used here in the config; nothing from .env is exposed to the browser code.
-  const { PORT = '3000' } = loadEnv(mode, repoRoot, '');
+  const { PORT = '3852' } = loadEnv(mode, repoRoot, '');
 
   return {
     root: fileURLToPath(new URL('.', import.meta.url)),

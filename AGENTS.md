@@ -93,7 +93,7 @@ See [.env.example](.env.example). `config.ts` validates everything at startup an
 | `CALDAV_USERNAME` | Required. Must not contain `:` (Basic auth separator). |
 | `CALDAV_PASSWORD` | Required. |
 | `HOST` | Default `0.0.0.0`. Use `127.0.0.1` when the reverse proxy is on the same machine. |
-| `PORT` | Default `3000`. Also read by the Vite dev server so `/proxy` stays in sync. |
+| `PORT` | Default `3852`. Also read by the Vite dev server so `/proxy` stays in sync. |
 | `FEED_TASKS_ENABLED` | `true` or `false` (default). Mounts `/feed/tasks`. |
 | `FEED_EVENTS_ENABLED` | `true` or `false` (default). Mounts `/feed/events`. |
 | `FEED_TOKEN` | Required when a feed is enabled. At least 32 characters of `A-Z a-z 0-9 - _`. |
@@ -138,7 +138,7 @@ npm run typecheck       # backend and frontend
 Or separately, in two terminals:
 
 ```sh
-npm run dev:backend     # the proxy on :3000 (Bun, reads .env, restarts on changes)
+npm run dev:backend     # the proxy on :3852 (Bun, reads .env, restarts on changes)
 npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to the backend
 ```
 

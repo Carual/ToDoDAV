@@ -66,7 +66,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
    | `CALDAV_USERNAME` | Your CalDAV username. |
    | `CALDAV_PASSWORD` | Your CalDAV password (ideally an app-specific one). |
    | `HOST` | Default `0.0.0.0`. Use `127.0.0.1` if the reverse proxy runs on the same machine. |
-   | `PORT` | Default `3000`. |
+   | `PORT` | Default `3852`. |
    | `FEED_TASKS_ENABLED`, `FEED_EVENTS_ENABLED`, `FEED_TOKEN` | Optional calendar feeds, see [below](#calendar-feeds-google-calendar). |
 
 3. **Start it**: `npm start` (Bun) or `npm run start:node` (Node). One process serves the app and the backend. Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /api/status` answers `{"status":"ok"}` so you can health-check it.
@@ -75,7 +75,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
    ```caddy
    tasks.example.com {
-       reverse_proxy 127.0.0.1:3000
+       reverse_proxy 127.0.0.1:3852
    }
    ```
 
@@ -89,11 +89,11 @@ The [Dockerfile](Dockerfile) builds the app and runs it on Bun, with `NODE_ENV=p
 
 ```sh
 docker build -t tododav .
-docker run -d --name tododav --restart unless-stopped --env-file .env -p 127.0.0.1:3000:3000 tododav
+docker run -d --name tododav --restart unless-stopped --env-file .env -p 127.0.0.1:3852:3852 tododav
 ```
 
 - In `.env`, set `NODE_ENV=production` (or remove the line) and leave `HOST` unset: inside the container ToDoDAV must listen on `0.0.0.0`.
-- `-p 127.0.0.1:3000:3000` only lets programs on the host reach it, such as the reverse proxy above. If the reverse proxy runs in Docker too, put both on the same network and drop `-p`, then point the proxy at `tododav:3000`.
+- `-p 127.0.0.1:3852:3852` only lets programs on the host reach it, such as the reverse proxy above. If the reverse proxy runs in Docker too, put both on the same network and drop `-p`, then point the proxy at `tododav:3852`.
 - Docker's `--env-file` takes values literally: don't wrap them in quotes.
 - To update: `git pull`, then build and run again (`docker rm -f tododav` first).
 

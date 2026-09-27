@@ -23,7 +23,7 @@ COPY --from=deps /app/node_modules node_modules
 COPY --from=build /app/dist dist
 COPY backend backend
 USER bun
-EXPOSE 3000
+EXPOSE 3852
 # /api/status answers over plain HTTP even in production, so it works from inside the container.
-HEALTHCHECK CMD ["bun", "-e", "fetch(`http://127.0.0.1:${process.env.PORT || 3000}/api/status`).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+HEALTHCHECK CMD ["bun", "-e", "fetch(`http://127.0.0.1:${process.env.PORT || 3852}/api/status`).then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["bun", "backend/index.ts"]
