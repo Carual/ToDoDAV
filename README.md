@@ -85,17 +85,24 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
 ### With Docker
 
-The [Dockerfile](Dockerfile) builds the app and runs it on Bun, with `NODE_ENV=production` already set and a health check on `/api/status`. Nothing needs to be installed on the host besides Docker.
+The [Dockerfile](Dockerfile) builds the app and runs it on Bun, with `NODE_ENV=production` already set and a health check on `/api/status`. Nothing needs to be installed on the host besides Docker. With [docker-compose.yaml](docker-compose.yaml):
 
 ```sh
-docker build -t tododav .
-docker run -d --name tododav --restart unless-stopped --env-file .env -p 127.0.0.1:3852:3852 tododav
+docker compose up -d --build
 ```
 
 - In `.env`, set `NODE_ENV=production` (or remove the line) and leave `HOST` unset: inside the container ToDoDAV must listen on `0.0.0.0`.
-- `-p 127.0.0.1:3852:3852` only lets programs on the host reach it, such as the reverse proxy above. If the reverse proxy runs in Docker too, put both on the same network and drop `-p`, then point the proxy at `tododav:3852`.
-- Docker's `--env-file` takes values literally: don't wrap them in quotes.
-- To update: `git pull`, then build and run again (`docker rm -f tododav` first).
+- The port is published as `127.0.0.1:3852`, so only programs on the host can reach it, such as the reverse proxy above. [docker-compose.yaml](docker-compose.yaml) also has a commented-out Caddy service, if you'd rather run the reverse proxy in the same stack.
+- To update: `git pull`, then `docker compose up -d --build` again.
+
+Without Compose:
+
+```sh
+docker build -t tododav .
+docker run -d --name tododav --restart unless-stopped --init --env-file .env -p 127.0.0.1:3852:3852 tododav
+```
+
+Docker's `--env-file` takes values literally, so don't wrap them in quotes. To update, `docker rm -f tododav` and build and run again.
 
 ## Calendar feeds (Google Calendar)
 
