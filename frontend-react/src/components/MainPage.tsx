@@ -5,6 +5,7 @@ import { useTaskList } from '../useTaskList.ts';
 import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { ShareModal } from './ShareModal.tsx';
+import { Spinner } from './Spinner.tsx';
 import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
 
@@ -222,7 +223,9 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                 </button>
               </div>
             ) : !list.loaded ? (
-              <p className="muted loading">Loading tasks…</p>
+              <div className="loading">
+                <Spinner label="Loading tasks" />
+              </div>
             ) : (
               <>
                 {openTasks.length > 0 && (

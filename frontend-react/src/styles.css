@@ -98,8 +98,73 @@ button {
 }
 
 .splash {
-  text-align: center;
-  margin-top: 30vh;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.splash .brand-mark {
+  width: 48px;
+  height: 48px;
+}
+
+/* ---------- Spinner ---------- */
+
+.spinner {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.spinner svg {
+  width: 100%;
+  height: 100%;
+  animation: spinner-turn 0.8s linear infinite;
+}
+
+.spinner circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.spinner-track {
+  stroke: var(--border);
+}
+
+.spinner-arc {
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+/* On a red button: white arc on a faint white ring. */
+.spinner-light {
+  color: #fff;
+}
+
+.spinner-light .spinner-track {
+  stroke: rgba(255, 255, 255, 0.35);
+}
+
+/* Page-level spinners wait a moment before showing, so fast loads don't flicker. */
+.splash .spinner,
+.loading .spinner {
+  animation: spinner-in 0.2s 0.15s both;
+}
+
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinner-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* ---------- Buttons ---------- */
@@ -116,6 +181,19 @@ button {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Working, not unavailable: full color, with the spinner in place of the label. */
+.btn[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
+.btn .spinner {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  margin: 0 auto;
 }
 
 .btn-primary {
@@ -344,7 +422,9 @@ button {
 }
 
 .loading {
-  padding: 16px 0;
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
 }
 
 .empty {

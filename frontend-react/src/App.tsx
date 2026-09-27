@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Credentials } from './api/caldav.ts';
 import { logIn, Login, type Session } from './components/Login.tsx';
+import { LogoMark } from './components/icons.tsx';
 import { MainPage } from './components/MainPage.tsx';
+import { Spinner } from './components/Spinner.tsx';
 import { navigate, parseRoute, usePath } from './router.ts';
 
 // sessionStorage: survives a page reload but is gone when the tab closes (never localStorage).
@@ -60,7 +62,14 @@ export function App() {
     setSession(null);
   }, []);
 
-  if (restoring) return <p className="splash muted">Loading…</p>;
+  if (restoring) {
+    return (
+      <div className="splash">
+        <LogoMark className="brand-mark" />
+        <Spinner />
+      </div>
+    );
+  }
   if (!session) {
     return (
       <Login

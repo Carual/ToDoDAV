@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { CalDavClient, NO_FEEDS, type Calendar, type Credentials, type ServerConfig } from '../api/caldav.ts';
 import { LogoMark } from './icons.tsx';
+import { Spinner } from './Spinner.tsx';
 
 export interface Session {
   client: CalDavClient;
@@ -64,8 +65,8 @@ export function Login({ onLogin }: { onLogin: (session: Session, credentials: Cr
               {error}
             </p>
           )}
-          <button className="btn btn-primary btn-block" disabled={busy}>
-            {busy ? 'Logging in…' : 'Log in'}
+          <button className="btn btn-primary btn-block" disabled={busy} aria-busy={busy}>
+            {busy ? <Spinner label="Logging in" className="spinner-light" /> : 'Log in'}
           </button>
         </form>
         <p className="login-hint">Use the username and password of your CalDAV server.</p>

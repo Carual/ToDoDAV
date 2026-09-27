@@ -30,7 +30,7 @@ frontend-react/
   src/api/caldav.ts   CalDAV client (plain fetch + DOMParser)
   src/api/tasks.ts    VTODO <-> Task model conversion (ical.js)
   src/useTaskList.ts  Task state per list, with optimistic changes and queued saves
-  src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, ConfirmDialog, icons
+  src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, ConfirmDialog, Spinner, icons
   src/format.ts       Due-date labels and date formatting
   src/router.ts       Tiny History-API router: /login, /tasks, /tasks/<uid>
   vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
