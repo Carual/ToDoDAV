@@ -6,24 +6,25 @@ import { CalendarIcon, CheckIcon, PencilIcon, TagIcon } from './icons.tsx';
 interface Props {
   task: Task;
   onOpen: (task: Task) => void;
-  onComplete: (task: Task) => void;
+  /** Completes an open task or reopens a completed one. */
+  onToggle: (task: Task) => void;
 }
 
 /** Delay between ticking the circle and the task leaving the list, like Todoist. */
 const COMPLETE_ANIMATION_MS = 300;
 
-export function TaskCheckbox({ task, onComplete }: { task: Task; onComplete: (task: Task) => void }) {
-  const [checked, setChecked] = useState(false);
+export function TaskCheckbox({ task, onToggle }: { task: Task; onToggle: (task: Task) => void }) {
+  const [checked, setChecked] = useState(task.completed);
   return (
     <button
       type="button"
       className={`task-check p${task.priority}${checked ? ' checked' : ''}`}
-      aria-label="Complete task"
+      aria-label={task.completed ? 'Reopen task' : 'Complete task'}
       onClick={(event) => {
         event.stopPropagation();
-        if (checked) return;
-        setChecked(true);
-        setTimeout(() => onComplete(task), COMPLETE_ANIMATION_MS);
+        if (checked !== task.completed) return; // already on its way out
+        setChecked(!checked);
+        setTimeout(() => onToggle(task), COMPLETE_ANIMATION_MS);
       }}
     >
       <CheckIcon />
@@ -31,13 +32,13 @@ export function TaskCheckbox({ task, onComplete }: { task: Task; onComplete: (ta
   );
 }
 
-export function TaskItem({ task, onOpen, onComplete }: Props) {
+export function TaskItem({ task, onOpen, onToggle }: Props) {
   const due = task.due && describeDue(task.due);
   const firstLine = task.description.split('\n')[0];
 
   return (
-    <li className="task" onClick={() => onOpen(task)}>
-      <TaskCheckbox task={task} onComplete={onComplete} />
+    <li className={`task${task.completed ? ' task-done' : ''}`} onClick={() => onOpen(task)}>
+      <TaskCheckbox task={task} onToggle={onToggle} />
       <div className="task-body">
         <div className="task-title">{task.summary || <span className="muted">Untitled task</span>}</div>
         {firstLine && <div className="task-desc">{firstLine}</div>}

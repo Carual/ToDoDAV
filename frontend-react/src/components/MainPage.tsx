@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { CalDavError } from '../api/caldav.ts';
-import { applyEdits, newTaskIcs, withCompleted, type Task, type TaskEdits } from '../api/tasks.ts';
+import { useEffect, useRef, useState } from 'react';
+import type { Task, TaskEdits } from '../api/tasks.ts';
 import { navigate, taskPath } from '../router.ts';
+import { useTaskList } from '../useTaskList.ts';
 import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { ShareModal } from './ShareModal.tsx';
@@ -9,25 +9,27 @@ import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
 
 const SELECTED_KEY = 'tododav.calendar';
+const SHOW_COMPLETED_KEY = 'tododav.showCompleted';
 
 interface Toast {
   message: string;
-  undo?: () => void;
+  /** A button in the toast, such as Undo or Retry. */
+  action?: { label: string; run: () => void };
 }
 
-function readSelected(): string | null {
+function readSetting(key: string): string | null {
   try {
-    return localStorage.getItem(SELECTED_KEY);
+    return localStorage.getItem(key);
   } catch {
     return null;
   }
 }
 
-function saveSelected(href: string) {
+function saveSetting(key: string, value: string) {
   try {
-    localStorage.setItem(SELECTED_KEY, href);
+    localStorage.setItem(key, value);
   } catch {
-    // Remembering the list is only a convenience.
+    // Remembering the list or the completed section is only a convenience.
   }
 }
 
@@ -42,6 +44,12 @@ function compareTasks(a: Task, b: Task): number {
   return byDue || a.priority - b.priority || a.summary.localeCompare(b.summary);
 }
 
+/** Completed tasks, most recently completed first (tasks without a completion time last). */
+function compareCompleted(a: Task, b: Task): number {
+  const byCompleted = (b.completedAt?.getTime() ?? 0) - (a.completedAt?.getTime() ?? 0);
+  return byCompleted || a.summary.localeCompare(b.summary);
+}
+
 interface Props {
   session: Session;
   /** UID of the task whose modal is open, from the URL (/tasks/<uid>). */
@@ -53,44 +61,16 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   const { client, calendars, config } = session;
   const canShare = config.feeds.tasks || config.feeds.events;
   const [calendarHref, setCalendarHref] = useState(() => {
-    const saved = readSelected();
+    const saved = readSetting(SELECTED_KEY);
     return calendars.find((c) => c.href === saved)?.href ?? calendars[0]?.href;
   });
+  const [showCompleted, setShowCompleted] = useState(() => readSetting(SHOW_COMPLETED_KEY) === 'true');
   const calendar = calendars.find((c) => c.href === calendarHref);
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  /** The list `tasks` belongs to, once loaded; until then a missing task may just not be loaded yet. */
-  const [loadedHref, setLoadedHref] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
-  const loadId = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const load = useCallback(async () => {
-    if (!calendarHref) return;
-    const id = ++loadId.current;
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const result = await client.listTasks(calendarHref);
-      if (id === loadId.current) {
-        setTasks(result);
-        setLoadedHref(calendarHref);
-      }
-    } catch (err) {
-      if (err instanceof CalDavError && err.status === 401) return onLogout();
-      if (id === loadId.current) setLoadError(err instanceof Error ? err.message : 'Could not load the tasks.');
-    } finally {
-      if (id === loadId.current) setLoading(false);
-    }
-  }, [client, calendarHref, onLogout]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   function showToast(next: Toast) {
     clearTimeout(toastTimer.current);
@@ -98,82 +78,68 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     toastTimer.current = setTimeout(() => setToast(null), 5000);
   }
 
-  function replaceTask(saved: Task) {
-    setTasks((current) => current.map((t) => (t.href === saved.href ? saved : t)));
-  }
+  // Every change shows at once; a failed save puts the task back and says so here.
+  const list = useTaskList({
+    client,
+    calendarHref,
+    onLogout,
+    onWriteError: ({ message, retry }) => showToast({ message, action: retry && { label: 'Retry', run: retry } }),
+  });
+  const { tasks } = list;
 
-  /** Saves new iCalendar text; on a conflict (412) the list is reloaded so the next try uses fresh data. */
-  async function persist(task: Task, ics: string): Promise<Task> {
-    try {
-      const saved = await client.saveTask(task, ics);
-      if (saved.etag) replaceTask(saved);
-      else void load(); // the server did not send the new ETag: reload to get it
-      return saved;
-    } catch (err) {
-      if (err instanceof CalDavError && err.status === 412) void load();
-      throw err;
-    }
-  }
-
-  async function setCompleted(task: Task, completed: boolean) {
-    replaceTask({ ...task, completed }); // optimistic: hide or show it right away
-    try {
-      const saved = await persist(task, withCompleted(task, completed));
-      if (completed) showToast({ message: 'Task completed', undo: () => void setCompleted(saved, false) });
-    } catch (err) {
-      replaceTask(task);
-      showToast({ message: err instanceof Error ? err.message : 'Could not update the task.' });
+  function setCompleted(task: Task, completed: boolean) {
+    list.setCompleted(task.href, completed);
+    if (completed) {
+      showToast({ message: 'Task completed', action: { label: 'Undo', run: () => list.setCompleted(task.href, false) } });
     }
   }
 
   function selectCalendar(href: string) {
     setCalendarHref(href);
-    saveSelected(href);
+    saveSetting(SELECTED_KEY, href);
   }
+
+  function toggleShowCompleted() {
+    setShowCompleted(!showCompleted);
+    saveSetting(SHOW_COMPLETED_KEY, String(!showCompleted));
+  }
+
+  const toggleTask = (task: Task) => setCompleted(task, !task.completed);
 
   const closeTask = () => navigate('/tasks');
 
-  async function saveEdits(task: Task, edits: TaskEdits) {
-    await persist(task, applyEdits(task, edits));
+  function saveEdits(task: Task, edits: TaskEdits) {
+    list.edit(task.href, edits);
     closeTask();
   }
 
-  async function createTask(edits: TaskEdits) {
+  function createTask(edits: TaskEdits) {
     if (!calendarHref) return;
-    const { uid, ics } = newTaskIcs(edits);
-    const created = await client.createTask(calendarHref, uid, ics);
-    if (created.etag) setTasks((current) => [...current, created]);
-    else void load(); // the server did not send the ETag: reload to get it
+    list.create(calendarHref, edits);
     setCreating(false);
   }
 
   const openTasks = tasks.filter((t) => !t.completed).sort(compareTasks);
+  const completedTasks = tasks.filter((t) => t.completed).sort(compareCompleted);
   const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
   const modalOpen = creating || sharing || openTask !== undefined;
 
   // A task link can point to another list (the URL has only the UID): look there and switch to it.
-  const taskMissing = openUid !== undefined && !openTask && loadedHref === calendarHref;
+  const taskMissing = openUid !== undefined && !openTask && list.fetched;
+  const { locate } = list;
   useEffect(() => {
-    if (!taskMissing) return;
+    if (!taskMissing || openUid === undefined) return;
     let cancelled = false;
-    void (async () => {
-      for (const other of calendars) {
-        if (other.href === calendarHref) continue;
-        const found = await client.listTasks(other.href).then(
-          (list) => list.some((t) => t.uid === openUid),
-          () => false, // an unreadable list just is not where the task is
-        );
-        if (cancelled) return;
-        if (found) return selectCalendar(other.href);
-      }
+    void locate(openUid, calendars.filter((c) => c.href !== calendarHref)).then((found) => {
       if (cancelled) return;
+      if (found) return selectCalendar(found);
       showToast({ message: 'Task not found' });
       navigate('/tasks', { replace: true });
-    })();
+    });
     return () => {
       cancelled = true;
     };
-  }, [taskMissing, openUid, calendarHref, calendars, client]);
+  }, [taskMissing, openUid, calendarHref, calendars, locate]);
 
   // "Q" opens the new-task modal, like Todoist's quick add (not while typing or with a modal open).
   useEffect(() => {
@@ -248,14 +214,14 @@ export function MainPage({ session, openUid, onLogout }: Props) {
               </div>
             </div>
 
-            {loadError ? (
+            {list.loadError ? (
               <div className="empty">
-                <p className="form-error">{loadError}</p>
-                <button type="button" className="btn btn-secondary" onClick={() => void load()}>
+                <p className="form-error">{list.loadError}</p>
+                <button type="button" className="btn btn-secondary" onClick={list.reload}>
                   Try again
                 </button>
               </div>
-            ) : loading && tasks.length === 0 ? (
+            ) : !list.loaded ? (
               <p className="muted loading">Loading tasks…</p>
             ) : (
               <>
@@ -266,7 +232,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                         key={task.href}
                         task={task}
                         onOpen={(t) => navigate(taskPath(t.uid))}
-                        onComplete={(t) => void setCompleted(t, true)}
+                        onToggle={toggleTask}
                       />
                     ))}
                   </ul>
@@ -283,6 +249,32 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                     <p>No open tasks in this list.</p>
                   </div>
                 )}
+                {completedTasks.length > 0 && (
+                  <section className="completed-section">
+                    <button
+                      type="button"
+                      className="completed-toggle"
+                      aria-expanded={showCompleted}
+                      onClick={toggleShowCompleted}
+                    >
+                      <ChevronDownIcon />
+                      Completed
+                      <span className="completed-count">{completedTasks.length}</span>
+                    </button>
+                    {showCompleted && (
+                      <ul className="task-list">
+                        {completedTasks.map((task) => (
+                          <TaskItem
+                            key={task.href}
+                            task={task}
+                            onOpen={(t) => navigate(taskPath(t.uid))}
+                            onToggle={toggleTask}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                )}
               </>
             )}
           </>
@@ -295,18 +287,19 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           calendar={calendar}
           onClose={() => setCreating(false)}
           onSave={createTask}
-          onComplete={(t) => void setCompleted(t, true)}
+          onToggle={toggleTask}
         />
       )}
 
       {calendar && !creating && openTask && (
         <TaskModal
-          key={`${openTask.href} ${openTask.etag}`}
+          // Remount only when the content changes (a reload or a failed save), not when a save just confirms it.
+          key={`${openTask.href} ${openTask.ics}`}
           task={openTask}
           calendar={calendar}
           onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
-          onComplete={(t) => void setCompleted(t, true)}
+          onToggle={toggleTask}
         />
       )}
 
@@ -317,16 +310,16 @@ export function MainPage({ session, openUid, onLogout }: Props) {
       {toast && (
         <div className="toast" role="status">
           <span>{toast.message}</span>
-          {toast.undo && (
+          {toast.action && (
             <button
               type="button"
               className="toast-action"
               onClick={() => {
-                toast.undo?.();
+                toast.action?.run();
                 setToast(null);
               }}
             >
-              Undo
+              {toast.action.label}
             </button>
           )}
         </div>

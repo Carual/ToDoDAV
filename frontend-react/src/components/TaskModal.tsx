@@ -12,8 +12,10 @@ interface Props {
   task?: Task;
   calendar: Calendar;
   onClose: () => void;
-  onSave: (edits: TaskEdits) => Promise<void>;
-  onComplete: (task: Task) => void;
+  /** Takes the edits and closes the modal at once; the save runs in the background. */
+  onSave: (edits: TaskEdits) => void;
+  /** Completes an open task or reopens a completed one. */
+  onToggle: (task: Task) => void;
 }
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4];
@@ -59,13 +61,11 @@ function problemWith(edits: TaskEdits): string | null {
   return null;
 }
 
-export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props) {
+export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) {
   const isNew = task === undefined;
   const [edits, setEdits] = useState(() => initialEdits(task));
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
   const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
@@ -73,7 +73,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
   // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type).
   const finalEdits: TaskEdits = { ...edits, start: inMode(edits.start, allDay), due: inMode(edits.due, allDay) };
   const problem = problemWith(finalEdits);
-  const canSave = dirty && !problem && !saving;
+  const canSave = dirty && !problem;
 
   function toggleAllDay(next: boolean) {
     setAllDay(next);
@@ -111,23 +111,15 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
     void askDiscard().then((discard) => discard && onClose());
   }
 
-  async function save() {
-    if (!canSave) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await onSave(finalEdits);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the task.');
-      setSaving(false);
-    }
+  function save() {
+    if (canSave) onSave(finalEdits);
   }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (askingDiscard) return; // the dialog on top owns the keyboard
       if (event.key === 'Escape') requestClose();
-      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void save();
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) save();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -141,7 +133,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [edits.description]);
 
-  const message = error ?? (dirty ? problem : null);
+  const message = dirty ? problem : null;
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && requestClose()}>
@@ -162,8 +154,8 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
               {task ? (
                 <TaskCheckbox
                   task={{ ...task, priority: edits.priority }}
-                  onComplete={(completed) => {
-                    onComplete(completed);
+                  onToggle={(toggled) => {
+                    onToggle(toggled);
                     onClose();
                   }}
                 />
@@ -281,17 +273,17 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
           <span className="modal-footer-message" role="alert">
             {message}
           </span>
-          <button type="button" className="btn btn-secondary" onClick={requestClose} disabled={saving}>
+          <button type="button" className="btn btn-secondary" onClick={requestClose}>
             Cancel
           </button>
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => void save()}
+            onClick={save}
             disabled={!canSave}
             title={`${isNew ? 'Add task' : 'Save'} (Ctrl+Enter)`}
           >
-            {saving ? (isNew ? 'Adding…' : 'Saving…') : isNew ? 'Add task' : 'Save'}
+            {isNew ? 'Add task' : 'Save'}
           </button>
         </footer>
       </div>

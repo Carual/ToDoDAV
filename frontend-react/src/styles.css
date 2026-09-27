@@ -536,6 +536,51 @@ button {
   outline: none;
 }
 
+/* Collapsible "Completed" section under the open tasks. */
+.completed-section {
+  margin-top: 24px;
+}
+
+.completed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  background: none;
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+}
+
+.completed-toggle svg {
+  color: var(--text-tertiary);
+  transition: transform 0.15s;
+}
+
+.completed-toggle[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+
+.completed-count {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+/* A completed task is done: struck through, and its date is no longer urgent. */
+.task-done .task-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.task-done .due {
+  color: var(--text-tertiary);
+}
+
 /* ---------- Task modal ---------- */
 
 .modal-backdrop {

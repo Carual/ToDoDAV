@@ -29,6 +29,7 @@ backend/
 frontend-react/
   src/api/caldav.ts   CalDAV client (plain fetch + DOMParser)
   src/api/tasks.ts    VTODO <-> Task model conversion (ical.js)
+  src/useTaskList.ts  Task state per list, with optimistic changes and queued saves
   src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, ConfirmDialog, icons
   src/format.ts       Due-date labels and date formatting
   src/router.ts       Tiny History-API router: /login, /tasks, /tasks/<uid>
@@ -107,6 +108,7 @@ A React + Vite app that looks and behaves like Todoist:
 - **Login:** asks the server for your task lists (a CalDAV PROPFIND), which only works with the right username and password. The credentials stay in `sessionStorage`, so they survive a reload but disappear when the tab closes.
 - **Main page:** the current list's name as the title, with a selector when there is more than one list (only calendars that support `VTODO` are shown). Open tasks are sorted by due date, then by priority.
 - **Task rows:** a round checkbox colored by priority completes the task (with Undo). Rows show the description, a color-coded due date and labels, plus an edit button on hover.
+- **Completed tasks:** a collapsible "Completed" section under the list (only when the list has any), most recently completed first, struck through. Its filled checkbox reopens the task. Whether it is expanded is remembered in `localStorage`, like the selected list.
 - **Add task:** the "+ Add task" row under the list (or the **Q** key) opens the same modal empty; its footer button says "Add task". New tasks get a random UID and are written with `If-None-Match: *`, so they can never overwrite an existing one.
 - **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires `DTSTART` and `DUE` to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves. With unsaved changes, every way out shows an in-app "Discard unsaved changes?" dialog (`ConfirmDialog`, never `window.confirm`): ×, Cancel, Escape, clicking outside, and the browser's Back/Forward. For Back/Forward, `useLeaveGuard` in `router.ts` undoes the move at once with `history.go()` (each history entry stores its index), waits for the dialog, and replays the move on Discard. Reloading or closing the tab can only get the browser's own prompt. The task's UID is shown in small print at the bottom of the sidebar. Opening a task pushes `/tasks/<uid>`, and closing, saving or completing it pushes `/tasks`.
 - **Share button:** next to the list selector, only when `/api/config` reports a feed. It opens a modal with the current list's feed links (`<origin>/feed/<tasks|events>/<token>/<list path>`) and a Copy button each, for Google Calendar's "From URL". `/api/config` is fetched at login; if it fails, the login still works and the button stays hidden.
@@ -117,6 +119,7 @@ A React + Vite app that looks and behaves like Todoist:
 
 - **All logic lives in the browser.** The backend is a dumb, stateless proxy; features are built in the frontend against standard CalDAV.
 - **Preserve what other apps wrote.** Edits go through `applyEdits`, which only touches the fields the modal owns. Reminders (`VALARM`), repeat rules (`RRULE`) and any unknown properties set by other CalDAV clients are kept.
+- **Optimistic updates.** Completing, reopening, editing and adding a task show at once, and the modal closes without waiting; the save runs in the background (`useTaskList`). Saves to one task are queued, each sending the ETag the previous one got back, so quick successive changes (edit, complete, Undo) never conflict with each other. If a save fails, the task goes back to what the server last confirmed (a new task disappears) and a toast says why. When the server could not be reached, the toast offers Retry. When the server refused, the list reloads instead. Lists already seen stay in memory, so switching lists shows them at once while a fresh copy loads, and a reload keeps the local version of tasks whose save is still in flight.
 - **Optimistic concurrency with ETags.** Updates send `If-Match` with the task's ETag. If the task changed elsewhere in the meantime, the server refuses the save and the list reloads instead of overwriting.
 - **Never clobber on create.** New tasks use `If-None-Match: *`.
 - **Same origin in dev and prod.** Vite's dev server proxies `/proxy`, `/api` and `/feed` to the backend, mirroring the production reverse proxy, so the frontend always calls relative URLs (and feed links built from `window.location.origin` work in dev too).
