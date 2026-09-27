@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Credentials } from './api/caldav.ts';
 import { logIn, Login, type Session } from './components/Login.tsx';
 import { MainPage } from './components/MainPage.tsx';
+import { navigate, parseRoute, usePath } from './router.ts';
 
 // sessionStorage: survives a page reload but is gone when the tab closes (never localStorage).
 const CREDENTIALS_KEY = 'tododav.credentials';
@@ -27,6 +28,22 @@ function writeCredentials(credentials: Credentials | null) {
 export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [restoring, setRestoring] = useState(() => readCredentials() !== null);
+  const path = usePath();
+  const route = parseRoute(path);
+  // Where to go after logging in: a task link opened while logged out ends up on that task.
+  const afterLogin = useRef('/tasks');
+
+  // /login without a session, /tasks... with one. Replace, not push, so Back never lands on a redirect.
+  useEffect(() => {
+    if (restoring) return;
+    if (!session && route.name !== 'login') {
+      if (route.name === 'tasks') afterLogin.current = path;
+      navigate('/login', { replace: true });
+    } else if (session && route.name !== 'tasks') {
+      navigate(afterLogin.current, { replace: true });
+      afterLogin.current = '/tasks';
+    }
+  }, [restoring, session, route.name, path]);
 
   // After a reload, log in again silently with the credentials kept for this tab.
   useEffect(() => {
@@ -54,5 +71,5 @@ export function App() {
       />
     );
   }
-  return <MainPage session={session} onLogout={logOut} />;
+  return <MainPage session={session} openUid={route.name === 'tasks' ? route.uid : undefined} onLogout={logOut} />;
 }

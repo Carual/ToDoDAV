@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Calendar } from '../api/caldav.ts';
 import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } from '../api/tasks.ts';
 import { describeDue, formatDateTime } from '../format.ts';
+import { useLeaveGuard } from '../router.ts';
+import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { CloseIcon, FlagIcon, HashIcon } from './icons.tsx';
 import { TaskCheckbox } from './TaskItem.tsx';
 
@@ -78,8 +80,35 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
     update({ start: inMode(edits.start, next), due: inMode(edits.due, next) });
   }
 
+  // One question at a time: every way out (close controls, Back/Forward) waits on the same answer.
+  const [askingDiscard, setAskingDiscard] = useState(false);
+  const discardAnswer = useRef<{ promise: Promise<boolean>; resolve: (discard: boolean) => void } | null>(null);
+
+  const askDiscard = useCallback((): Promise<boolean> => {
+    if (!discardAnswer.current) {
+      let resolve!: (discard: boolean) => void;
+      const promise = new Promise<boolean>((r) => (resolve = r));
+      discardAnswer.current = { promise, resolve };
+      setAskingDiscard(true);
+    }
+    return discardAnswer.current.promise;
+  }, []);
+
+  function answerDiscard(discard: boolean) {
+    discardAnswer.current?.resolve(discard);
+    discardAnswer.current = null;
+    setAskingDiscard(false);
+  }
+
+  // Closing for another reason while asking must still settle the question (the router waits on it).
+  useEffect(() => () => discardAnswer.current?.resolve(false), []);
+
+  // Back/Forward ask too, not only the modal's own close controls.
+  useLeaveGuard(dirty, askDiscard);
+
   function requestClose() {
-    if (!dirty || window.confirm('Discard your changes?')) onClose();
+    if (!dirty) return onClose();
+    void askDiscard().then((discard) => discard && onClose());
   }
 
   async function save() {
@@ -96,6 +125,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (askingDiscard) return; // the dialog on top owns the keyboard
       if (event.key === 'Escape') requestClose();
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) void save();
     };
@@ -238,6 +268,12 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
                 </dl>
               </SidebarItem>
             )}
+
+            {task && (
+              <p className="modal-uid" title="UID: this task's identifier, also in its link">
+                UID <span className="modal-uid-value">{task.uid}</span>
+              </p>
+            )}
           </aside>
         </div>
 
@@ -245,7 +281,7 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
           <span className="modal-footer-message" role="alert">
             {message}
           </span>
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn btn-secondary" onClick={requestClose} disabled={saving}>
             Cancel
           </button>
           <button
@@ -259,6 +295,16 @@ export function TaskModal({ task, calendar, onClose, onSave, onComplete }: Props
           </button>
         </footer>
       </div>
+
+      {askingDiscard && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          message={isNew ? 'This task has not been added yet.' : 'The changes you made to this task will be lost.'}
+          confirmLabel="Discard"
+          onConfirm={() => answerDiscard(true)}
+          onCancel={() => answerDiscard(false)}
+        />
+      )}
     </div>
   );
 }

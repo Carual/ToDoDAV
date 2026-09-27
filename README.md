@@ -71,7 +71,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
 3. **Start the backend**: `npm start` (Bun) or `npm run start:node` (Node). Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /` answers `{"status":"ok"}` so you can health-check it.
 
-4. **Put it behind your reverse proxy.** The proxy serves the built app as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, all on one domain. For example, with Caddy:
+4. **Put it behind your reverse proxy.** The proxy serves the built app as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, all on one domain. Any other path that isn't a file (such as `/login`, `/tasks` or `/tasks/<uid>`) must be answered with `index.html`, so links to the app work. For example, with Caddy:
 
    ```caddy
    tasks.example.com {
@@ -81,12 +81,13 @@ Open http://localhost:5173 and log in with the same username and password you pu
        }
        handle {
            root * /path/to/tododav/dist/frontend-react
+           try_files {path} /index.html
            file_server
        }
    }
    ```
 
-   With nginx/openresty, make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without it, requests are rejected with `403`.
+   With nginx/openresty, use `try_files $uri /index.html;` for the app, and make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without that header, requests are rejected with `403`.
 
 ## Calendar feeds (Google Calendar)
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalDavError } from '../api/caldav.ts';
 import { applyEdits, newTaskIcs, withCompleted, type Task, type TaskEdits } from '../api/tasks.ts';
+import { navigate, taskPath } from '../router.ts';
 import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { ShareModal } from './ShareModal.tsx';
@@ -41,7 +42,14 @@ function compareTasks(a: Task, b: Task): number {
   return byDue || a.priority - b.priority || a.summary.localeCompare(b.summary);
 }
 
-export function MainPage({ session, onLogout }: { session: Session; onLogout: () => void }) {
+interface Props {
+  session: Session;
+  /** UID of the task whose modal is open, from the URL (/tasks/<uid>). */
+  openUid?: string;
+  onLogout: () => void;
+}
+
+export function MainPage({ session, openUid, onLogout }: Props) {
   const { client, calendars, config } = session;
   const canShare = config.feeds.tasks || config.feeds.events;
   const [calendarHref, setCalendarHref] = useState(() => {
@@ -53,7 +61,8 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [openHref, setOpenHref] = useState<string | null>(null);
+  /** The list `tasks` belongs to, once loaded; until then a missing task may just not be loaded yet. */
+  const [loadedHref, setLoadedHref] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -67,7 +76,10 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
     setLoadError(null);
     try {
       const result = await client.listTasks(calendarHref);
-      if (id === loadId.current) setTasks(result);
+      if (id === loadId.current) {
+        setTasks(result);
+        setLoadedHref(calendarHref);
+      }
     } catch (err) {
       if (err instanceof CalDavError && err.status === 401) return onLogout();
       if (id === loadId.current) setLoadError(err instanceof Error ? err.message : 'Could not load the tasks.');
@@ -114,9 +126,16 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
     }
   }
 
+  function selectCalendar(href: string) {
+    setCalendarHref(href);
+    saveSelected(href);
+  }
+
+  const closeTask = () => navigate('/tasks');
+
   async function saveEdits(task: Task, edits: TaskEdits) {
     await persist(task, applyEdits(task, edits));
-    setOpenHref(null);
+    closeTask();
   }
 
   async function createTask(edits: TaskEdits) {
@@ -129,8 +148,32 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
   }
 
   const openTasks = tasks.filter((t) => !t.completed).sort(compareTasks);
-  const openTask = tasks.find((t) => t.href === openHref);
+  const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
   const modalOpen = creating || sharing || openTask !== undefined;
+
+  // A task link can point to another list (the URL has only the UID): look there and switch to it.
+  const taskMissing = openUid !== undefined && !openTask && loadedHref === calendarHref;
+  useEffect(() => {
+    if (!taskMissing) return;
+    let cancelled = false;
+    void (async () => {
+      for (const other of calendars) {
+        if (other.href === calendarHref) continue;
+        const found = await client.listTasks(other.href).then(
+          (list) => list.some((t) => t.uid === openUid),
+          () => false, // an unreadable list just is not where the task is
+        );
+        if (cancelled) return;
+        if (found) return selectCalendar(other.href);
+      }
+      if (cancelled) return;
+      showToast({ message: 'Task not found' });
+      navigate('/tasks', { replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [taskMissing, openUid, calendarHref, calendars, client]);
 
   // "Q" opens the new-task modal, like Todoist's quick add (not while typing or with a modal open).
   useEffect(() => {
@@ -191,10 +234,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
                     <span className="visually-hidden">Task list</span>
                     <select
                       value={calendar.href}
-                      onChange={(e) => {
-                        setCalendarHref(e.target.value);
-                        saveSelected(e.target.value);
-                      }}
+                      onChange={(e) => selectCalendar(e.target.value)}
                     >
                       {calendars.map((c) => (
                         <option key={c.href} value={c.href}>
@@ -225,7 +265,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
                       <TaskItem
                         key={task.href}
                         task={task}
-                        onOpen={(t) => setOpenHref(t.href)}
+                        onOpen={(t) => navigate(taskPath(t.uid))}
                         onComplete={(t) => void setCompleted(t, true)}
                       />
                     ))}
@@ -264,7 +304,7 @@ export function MainPage({ session, onLogout }: { session: Session; onLogout: ()
           key={`${openTask.href} ${openTask.etag}`}
           task={openTask}
           calendar={calendar}
-          onClose={() => setOpenHref(null)}
+          onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
           onComplete={(t) => void setCompleted(t, true)}
         />

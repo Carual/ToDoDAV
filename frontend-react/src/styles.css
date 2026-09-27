@@ -858,6 +858,52 @@ button {
   color: var(--p3);
 }
 
+.modal-uid {
+  margin: 16px 0 0;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.modal-uid-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  user-select: all;
+}
+
+/* ---------- Confirm dialog ---------- */
+
+.confirm-backdrop {
+  z-index: 20; /* above the modal that asked */
+  align-items: center;
+  padding-top: 16px;
+}
+
+.confirm-dialog {
+  max-width: 420px;
+}
+
+.confirm-body {
+  padding: 20px 20px 8px;
+}
+
+.confirm-body h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.confirm-body p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+
 /* ---------- Share modal ---------- */
 
 .modal-small {

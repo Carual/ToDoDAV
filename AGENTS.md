@@ -29,8 +29,9 @@ backend/
 frontend-react/
   src/api/caldav.ts   CalDAV client (plain fetch + DOMParser)
   src/api/tasks.ts    VTODO <-> Task model conversion (ical.js)
-  src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, icons
+  src/components/     Login, MainPage, TaskItem, TaskModal, ShareModal, ConfirmDialog, icons
   src/format.ts       Due-date labels and date formatting
+  src/router.ts       Tiny History-API router: /login, /tasks, /tasks/<uid>
   vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
 .env.example      Documented configuration
 ```
@@ -53,7 +54,7 @@ Security headers come from `helmet`, and the proxying itself from `http-proxy-mi
 
 `GET /api/config` tells the frontend what this install offers: `{"feeds":{"tasks":true,"events":false,"token":"..."}}` (`token` only when a feed is on). It has the same HTTPS and credential checks as `/proxy`, because it reveals the feed token, and is sent with `Cache-Control: no-store`. Keep it to settings the frontend needs; never the CalDAV credentials.
 
-The backend does **not** serve the built frontend. In production, the reverse proxy serves `dist/frontend-react/` as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, so they all share one origin.
+The backend does **not** serve the built frontend. In production, the reverse proxy serves `dist/frontend-react/` as static files and forwards `/proxy/*`, `/api/*` and `/feed/*` to the backend, so they all share one origin. The frontend has client-side routes, so the reverse proxy must answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
 ### Feeds (`/feed`)
 
@@ -100,11 +101,12 @@ See [.env.example](.env.example). `config.ts` validates everything at startup an
 
 A React + Vite app that looks and behaves like Todoist:
 
+- **Routes:** `/login`, `/tasks`, and `/tasks/<uid>`, which is the tasks page with that task's modal open. The router is `src/router.ts` (History API + `useSyncExternalStore`, no dependency). Without a session every path redirects to `/login`, remembering a `/tasks...` path to return to after logging in. With a session, anything that isn't `/tasks...` redirects to `/tasks`. Redirects use `replaceState`, so Back never lands on one. The UID is percent-encoded in the path because UIDs are free text. If the UID isn't in the current list, the other lists are searched and the app switches to the one holding it. Otherwise it shows "Task not found" and goes back to `/tasks`.
 - **Login:** asks the server for your task lists (a CalDAV PROPFIND), which only works with the right username and password. The credentials stay in `sessionStorage`, so they survive a reload but disappear when the tab closes.
 - **Main page:** the current list's name as the title, with a selector when there is more than one list (only calendars that support `VTODO` are shown). Open tasks are sorted by due date, then by priority.
 - **Task rows:** a round checkbox colored by priority completes the task (with Undo). Rows show the description, a color-coded due date and labels, plus an edit button on hover.
 - **Add task:** the "+ Add task" row under the list (or the **Q** key) opens the same modal empty; its footer button says "Add task". New tasks get a random UID and are written with `If-None-Match: *`, so they can never overwrite an existing one.
-- **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires `DTSTART` and `DUE` to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves.
+- **Task modal:** shows everything about the task and lets you edit the title, description, an optional start date, the due date, priority and labels. An "All day" switch covers both dates: on means date only, off means date and time (iCalendar requires `DTSTART` and `DUE` to be the same type). Save and Cancel sit in the footer, and Ctrl/⌘+Enter saves. With unsaved changes, every way out shows an in-app "Discard unsaved changes?" dialog (`ConfirmDialog`, never `window.confirm`): ×, Cancel, Escape, clicking outside, and the browser's Back/Forward. For Back/Forward, `useLeaveGuard` in `router.ts` undoes the move at once with `history.go()` (each history entry stores its index), waits for the dialog, and replays the move on Discard. Reloading or closing the tab can only get the browser's own prompt. The task's UID is shown in small print at the bottom of the sidebar. Opening a task pushes `/tasks/<uid>`, and closing, saving or completing it pushes `/tasks`.
 - **Share button:** next to the list selector, only when `/api/config` reports a feed. It opens a modal with the current list's feed links (`<origin>/feed/<tasks|events>/<token>/<list path>`) and a Copy button each, for Google Calendar's "From URL". `/api/config` is fetched at login; if it fails, the login still works and the button stays hidden.
 
 `src/api/caldav.ts` is the CalDAV client (plain `fetch` + `DOMParser`), and `src/api/tasks.ts` converts between iCalendar `VTODO` and the task model using `ical.js`.
