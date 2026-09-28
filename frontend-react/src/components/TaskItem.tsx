@@ -1,7 +1,8 @@
-import { useState, type CSSProperties } from 'react';
+import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Task } from '../api/tasks.ts';
 import { describeDue } from '../format.ts';
-import { CalendarIcon, CheckIcon, ChevronDownIcon, PencilIcon, SubtaskIcon, TagIcon } from './icons.tsx';
+import { BLOCK_FIELDS, type RowField } from '../viewSettings.ts';
+import { CalendarIcon, CheckIcon, ChevronDownIcon, MapPinIcon, PencilIcon, SubtaskIcon, TagIcon } from './icons.tsx';
 
 interface Props {
   task: Task;
@@ -9,6 +10,8 @@ interface Props {
   depth?: number;
   /** Direct sub-tasks: how many are done, out of how many. */
   subtasks?: { done: number; total: number };
+  /** The details to show under the title, in order (from the settings). */
+  fields: RowField[];
   /** Whether the open sub-tasks under this row are hidden; only for rows that have some. */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
@@ -42,11 +45,86 @@ export function TaskCheckbox({ task, onToggle }: { task: Task; onToggle: (task: 
   );
 }
 
-export function TaskItem({ task, depth = 0, subtasks, collapsed, onToggleCollapsed, onOpen, onToggle }: Props) {
-  const due = task.due && describeDue(task.due);
-  const firstLine = task.description.split('\n')[0];
-  const hasSubtasks = subtasks !== undefined && subtasks.total > 0;
+/** One detail of a row, or nothing when the task has no such detail. */
+function renderField(field: RowField, task: Task, subtasks: Props['subtasks']): ReactNode {
+  switch (field) {
+    case 'description': {
+      const firstLine = task.description.split('\n')[0];
+      return firstLine && <div className="task-desc">{firstLine}</div>;
+    }
+    case 'location':
+      return (
+        task.location && (
+          <div className="task-location">
+            <MapPinIcon />
+            <span>{task.location}</span>
+          </div>
+        )
+      );
+    case 'subtasks':
+      return (
+        subtasks !== undefined &&
+        subtasks.total > 0 && (
+          <span className="label" title="Sub-tasks done">
+            <SubtaskIcon />
+            {subtasks.done}/{subtasks.total}
+          </span>
+        )
+      );
+    case 'start':
+      return (
+        task.start && (
+          <span className="label" title="Start date">
+            <CalendarIcon />
+            Starts {describeDue(task.start).label}
+          </span>
+        )
+      );
+    case 'due': {
+      const due = task.due && describeDue(task.due);
+      return (
+        due && (
+          <span className={`due due-${due.tone}`} title="Due date">
+            <CalendarIcon />
+            {due.label}
+          </span>
+        )
+      );
+    }
+    case 'labels':
+      return task.categories.map((label) => (
+        <span key={label} className="label">
+          <TagIcon />
+          {label}
+        </span>
+      ));
+  }
+}
 
+/** The details in the chosen order; small ones next to each other share a line. */
+function TaskDetails({ task, fields, subtasks }: { task: Task; fields: RowField[]; subtasks: Props['subtasks'] }) {
+  const lines: ReactNode[] = [];
+  let inline: ReactNode[] = [];
+  const flush = () => {
+    if (inline.length > 0) lines.push(<div key={lines.length} className="task-meta">{inline}</div>);
+    inline = [];
+  };
+  for (const field of fields) {
+    const content = renderField(field, task, subtasks);
+    const empty = !content || (Array.isArray(content) && content.length === 0);
+    if (empty) continue;
+    if (BLOCK_FIELDS.has(field)) {
+      flush();
+      lines.push(<Fragment key={lines.length}>{content}</Fragment>);
+    } else {
+      inline.push(<Fragment key={field}>{content}</Fragment>);
+    }
+  }
+  flush();
+  return <>{lines}</>;
+}
+
+export function TaskItem({ task, depth = 0, subtasks, fields, collapsed, onToggleCollapsed, onOpen, onToggle }: Props) {
   return (
     <li
       className={`task${task.completed ? ' task-done' : ''}`}
@@ -71,29 +149,7 @@ export function TaskItem({ task, depth = 0, subtasks, collapsed, onToggleCollaps
       <TaskCheckbox task={task} onToggle={onToggle} />
       <div className="task-body">
         <div className="task-title">{task.summary || <span className="muted">Untitled task</span>}</div>
-        {firstLine && <div className="task-desc">{firstLine}</div>}
-        {(due || hasSubtasks || task.categories.length > 0) && (
-          <div className="task-meta">
-            {hasSubtasks && (
-              <span className="label" title="Sub-tasks done">
-                <SubtaskIcon />
-                {subtasks.done}/{subtasks.total}
-              </span>
-            )}
-            {due && (
-              <span className={`due due-${due.tone}`}>
-                <CalendarIcon />
-                {due.label}
-              </span>
-            )}
-            {task.categories.map((label) => (
-              <span key={label} className="label">
-                <TagIcon />
-                {label}
-              </span>
-            ))}
-          </div>
-        )}
+        <TaskDetails task={task} fields={fields} subtasks={subtasks} />
       </div>
       <div className="task-actions">
         <button

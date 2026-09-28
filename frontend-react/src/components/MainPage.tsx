@@ -3,8 +3,22 @@ import type { Task, TaskEdits } from '../api/tasks.ts';
 import { navigate, taskPath } from '../router.ts';
 import { ancestors, buildTree, descendants, type TaskTree } from '../taskTree.ts';
 import { useTaskList } from '../useTaskList.ts';
-import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
+import {
+  DEFAULT_SETTINGS,
+  describeFilters,
+  filtersActive,
+  loadSettings,
+  matchesFilters,
+  readSetting,
+  saveSetting,
+  saveSettings,
+  type Filters,
+  type ViewSettings,
+} from '../viewSettings.ts';
+import { FilterModal } from './FilterModal.tsx';
+import { ChevronDownIcon, FilterIcon, GearIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
+import { SettingsModal } from './SettingsModal.tsx';
 import { ShareModal } from './ShareModal.tsx';
 import { Spinner } from './Spinner.tsx';
 import { TaskItem } from './TaskItem.tsx';
@@ -19,31 +33,18 @@ interface Toast {
   action?: { label: string; run: () => void };
 }
 
-function readSetting(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
+type Compare = (a: Task, b: Task) => number;
 
-function saveSetting(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Remembering the list or the completed section is only a convenience.
-  }
-}
-
-/** Open tasks by due date (undated last), then by priority, then by name. */
-function compareTasks(a: Task, b: Task): number {
-  if (a.due && !b.due) return -1;
-  if (!a.due && b.due) return 1;
-  // ISO dates compare correctly as plain strings; all-day tasks go after timed ones on the same day.
-  const dueA = a.due ? `${a.due.date} ${a.due.time ?? '99:99'}` : '';
-  const dueB = b.due ? `${b.due.date} ${b.due.time ?? '99:99'}` : '';
-  const byDue = dueA < dueB ? -1 : dueA > dueB ? 1 : 0;
-  return byDue || a.priority - b.priority || a.summary.localeCompare(b.summary);
+/** Open tasks by due date (undated ones last, or first if asked), then by priority, then by name. */
+function taskOrder(undatedFirst: boolean): Compare {
+  return (a, b) => {
+    if (!a.due !== !b.due) return (a.due ? -1 : 1) * (undatedFirst ? -1 : 1);
+    // ISO dates compare correctly as plain strings; all-day tasks go after timed ones on the same day.
+    const dueA = a.due ? `${a.due.date} ${a.due.time ?? '99:99'}` : '';
+    const dueB = b.due ? `${b.due.date} ${b.due.time ?? '99:99'}` : '';
+    const byDue = dueA < dueB ? -1 : dueA > dueB ? 1 : 0;
+    return byDue || a.priority - b.priority || a.summary.localeCompare(b.summary);
+  };
 }
 
 /** Completed tasks, most recently completed first (tasks without a completion time last). */
@@ -57,27 +58,51 @@ interface Row {
   depth: number;
 }
 
+/** How the open tasks are listed, from the settings. */
+interface ListView {
+  matches: (task: Task) => boolean;
+  compare: Compare;
+  /** Sub-tasks under their parent; otherwise every open task at the top level. */
+  nested: boolean;
+}
+
 /**
  * Open tasks in display order, each sub-task right under its parent. An open sub-task of a completed
- * parent (possible when another app completed the parent) shows at the top level instead.
+ * parent (possible when another app completed the parent) shows at the top level instead. When the
+ * filters leave a task out, its matching sub-tasks take its place.
  */
-function openRows(tasks: Task[], tree: TaskTree, collapsed: ReadonlySet<string>): Row[] {
+function openRows(tasks: Task[], tree: TaskTree, collapsed: ReadonlySet<string>, view: ListView): Row[] {
+  const { matches, compare } = view;
+  if (!view.nested) {
+    return tasks.filter((t) => !t.completed && matches(t)).sort(compare).map((task) => ({ task, depth: 0 }));
+  }
   const rows: Row[] = [];
   const visit = (task: Task, depth: number) => {
+    if (!matches(task)) {
+      for (const child of openChildren(tree, task, compare)) visit(child, depth);
+      return;
+    }
     rows.push({ task, depth });
     if (collapsed.has(task.uid)) return;
-    for (const child of openChildren(tree, task)) visit(child, depth + 1);
+    for (const child of openChildren(tree, task, compare)) visit(child, depth + 1);
   };
   const isRoot = (task: Task) => !tree.parentOf(task) || tree.parentOf(task)!.completed;
-  tasks.filter((t) => !t.completed && isRoot(t)).sort(compareTasks).forEach((t) => visit(t, 0));
+  tasks.filter((t) => !t.completed && isRoot(t)).sort(compare).forEach((t) => visit(t, 0));
   return rows;
 }
 
-const openChildren = (tree: TaskTree, task: Task) => tree.childrenOf(task).filter((t) => !t.completed).sort(compareTasks);
+const openChildren = (tree: TaskTree, task: Task, compare: Compare) =>
+  tree.childrenOf(task).filter((t) => !t.completed).sort(compare);
+
+/** Whether any open task below this one would show, so its chevron has something to hide. */
+function hasShownChildren(tree: TaskTree, task: Task, view: ListView): boolean {
+  if (!view.nested) return false;
+  return openChildren(tree, task, view.compare).some((child) => view.matches(child) || hasShownChildren(tree, child, view));
+}
 
 /** Direct sub-tasks: open ones first in list order, then completed ones. */
-const sortedChildren = (tree: TaskTree, task: Task) => [
-  ...openChildren(tree, task),
+const sortedChildren = (tree: TaskTree, task: Task, compare: Compare) => [
+  ...openChildren(tree, task, compare),
   ...tree.childrenOf(task).filter((t) => t.completed).sort(compareCompleted),
 ];
 
@@ -107,6 +132,17 @@ export function MainPage({ session, openUid, onLogout }: Props) {
 
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [editingFilters, setEditingFilters] = useState(false);
+  const [settings, setSettings] = useState(loadSettings);
+
+  function changeSettings(next: ViewSettings) {
+    setSettings(next);
+    saveSettings(next);
+  }
+
+  const changeFilters = (filters: Filters) => changeSettings({ ...settings, filters });
+
   const [toast, setToast] = useState<Toast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -181,10 +217,20 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     list.create(calendarHref, { summary, description: '', priority: 4, categories: [], location: '' }, parent.uid);
   }
 
-  const openTasks = openRows(tasks, tree, collapsed);
-  const completedTasks = tasks.filter((t) => t.completed).sort(compareCompleted);
+  const { filters } = settings;
+  const filtered = filtersActive(filters);
+  const view: ListView = {
+    matches: (task) => matchesFilters(task, filters),
+    compare: taskOrder(settings.layout.undatedFirst),
+    nested: settings.layout.nestSubtasks,
+  };
+  const fields = settings.fields.filter((f) => f.visible).map((f) => f.field);
+  const labels = useMemo(() => [...new Set(tasks.flatMap((t) => t.categories))].sort((a, b) => a.localeCompare(b)), [tasks]);
+
+  const openTasks = openRows(tasks, tree, collapsed, view);
+  const completedTasks = tasks.filter((t) => t.completed && view.matches(t)).sort(compareCompleted);
   const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
-  const modalOpen = creating || sharing || openTask !== undefined;
+  const modalOpen = creating || sharing || editingSettings || editingFilters || openTask !== undefined;
 
   // A task link can point to another list (the URL has only the UID): look there and switch to it.
   const taskMissing = openUid !== undefined && !openTask && list.fetched;
@@ -225,6 +271,15 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           ToDoDAV
         </div>
         <div className="account">
+          <button
+            type="button"
+            className="icon-btn"
+            aria-label="Settings"
+            title="Settings"
+            onClick={() => setEditingSettings(true)}
+          >
+            <GearIcon />
+          </button>
           <span className="avatar" aria-hidden="true">
             {client.username.slice(0, 1).toUpperCase()}
           </span>
@@ -244,7 +299,18 @@ export function MainPage({ session, openUid, onLogout }: Props) {
         ) : (
           <>
             <div className="view-header">
-              <h1>{calendar.name}</h1>
+              <div className="view-title">
+                <h1>{calendar.name}</h1>
+                <button
+                  type="button"
+                  className={`icon-btn${filtered ? ' icon-btn-active' : ''}`}
+                  aria-label={filtered ? 'Filters (on)' : 'Filters'}
+                  title="Filters"
+                  onClick={() => setEditingFilters(true)}
+                >
+                  <FilterIcon />
+                </button>
+              </div>
               <div className="view-actions">
                 {canShare && (
                   <button
@@ -276,6 +342,17 @@ export function MainPage({ session, openUid, onLogout }: Props) {
               </div>
             </div>
 
+            {filtered && (
+              <div className="filter-bar">
+                <button type="button" className="filter-summary" onClick={() => setEditingFilters(true)}>
+                  Filtered: {describeFilters(filters).join(' · ')}
+                </button>
+                <button type="button" className="btn btn-link" onClick={() => changeFilters(DEFAULT_SETTINGS.filters)}>
+                  Clear
+                </button>
+              </div>
+            )}
+
             {list.loadError ? (
               <div className="empty">
                 <p className="form-error">{list.loadError}</p>
@@ -297,9 +374,10 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                         task={task}
                         depth={depth}
                         subtasks={subtaskCount(tree, task)}
+                        fields={fields}
                         collapsed={collapsed.has(task.uid)}
                         onToggleCollapsed={
-                          openChildren(tree, task).length > 0 ? () => toggleCollapsed(task.uid) : undefined
+                          hasShownChildren(tree, task, view) ? () => toggleCollapsed(task.uid) : undefined
                         }
                         onOpen={openTaskPage}
                         onToggle={toggleTask}
@@ -313,12 +391,18 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                   </span>
                   Add task
                 </button>
-                {openTasks.length === 0 && (
-                  <div className="empty">
-                    <h2>All clear</h2>
-                    <p>No open tasks in this list.</p>
-                  </div>
-                )}
+                {openTasks.length === 0 &&
+                  (filtered ? (
+                    <div className="empty">
+                      <h2>No matching tasks</h2>
+                      <p>No open tasks in this list match the filters.</p>
+                    </div>
+                  ) : (
+                    <div className="empty">
+                      <h2>All clear</h2>
+                      <p>No open tasks in this list.</p>
+                    </div>
+                  ))}
                 {completedTasks.length > 0 && (
                   <section className="completed-section">
                     <button
@@ -334,7 +418,13 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                     {showCompleted && (
                       <ul className="task-list">
                         {completedTasks.map((task) => (
-                          <TaskItem key={task.href} task={task} onOpen={openTaskPage} onToggle={toggleTask} />
+                          <TaskItem
+                            key={task.href}
+                            task={task}
+                            fields={fields}
+                            onOpen={openTaskPage}
+                            onToggle={toggleTask}
+                          />
                         ))}
                       </ul>
                     )}
@@ -353,6 +443,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           onClose={() => setCreating(false)}
           onSave={createTask}
           onToggle={toggleTask}
+          showMap={settings.showMap}
         />
       )}
 
@@ -362,18 +453,32 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           key={`${openTask.href} ${openTask.ics}`}
           task={openTask}
           parent={tree.parentOf(openTask)}
-          subtasks={sortedChildren(tree, openTask)}
+          subtasks={sortedChildren(tree, openTask, view.compare)}
           calendar={calendar}
           onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
           onToggle={toggleTask}
           onOpenTask={openTaskPage}
           onAddSubtask={(summary) => addSubtask(openTask, summary)}
+          showMap={settings.showMap}
         />
       )}
 
       {calendar && sharing && (
         <ShareModal client={client} calendar={calendar} feeds={config.feeds} onClose={() => setSharing(false)} />
+      )}
+
+      {editingSettings && (
+        <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setEditingSettings(false)} />
+      )}
+
+      {editingFilters && (
+        <FilterModal
+          filters={filters}
+          labels={labels}
+          onChange={changeFilters}
+          onClose={() => setEditingFilters(false)}
+        />
       )}
 
       {toast && (

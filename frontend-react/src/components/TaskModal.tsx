@@ -24,6 +24,8 @@ interface Props {
   onOpenTask?: (task: Task) => void;
   /** Adds an open sub-task with this name; the save runs in the background. */
   onAddSubtask?: (summary: string) => void;
+  /** Show a map under the location (a setting, off by default). */
+  showMap?: boolean;
 }
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4];
@@ -88,14 +90,23 @@ function problemWith(edits: TaskEdits): string | null {
   return null;
 }
 
-export function TaskModal({ task, parent, subtasks = [], calendar, onClose, onSave, onToggle, onOpenTask, onAddSubtask }: Props) {
+export function TaskModal({
+  task,
+  parent,
+  subtasks = [],
+  calendar,
+  onClose,
+  onSave,
+  onToggle,
+  onOpenTask,
+  onAddSubtask,
+  showMap = false,
+}: Props) {
   const isNew = task === undefined;
   const [edits, setEdits] = useState(() => initialEdits(task));
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
   const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
-  // Off until asked: the frame sends the location (and the user's Google cookies) to Google.
-  const [showMap, setShowMap] = useState(false);
   const mapLocation = useDebounced(edits.location.trim(), MAP_DELAY_MS);
 
   const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
@@ -364,16 +375,7 @@ export function TaskModal({ task, parent, subtasks = [], calendar, onClose, onSa
               />
             </SidebarItem>
 
-            <SidebarItem
-              title="Location"
-              action={
-                <label className="switch">
-                  <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} />
-                  <span className="switch-track" aria-hidden="true" />
-                  Map
-                </label>
-              }
-            >
+            <SidebarItem title="Location">
               <div className="location-row">
                 <input
                   className="sidebar-text"

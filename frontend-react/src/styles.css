@@ -386,6 +386,24 @@ button {
   overflow-wrap: anywhere;
 }
 
+.view-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.view-title .icon-btn {
+  flex-shrink: 0;
+}
+
+/* A button whose feature is on (filters applied): in the accent color, so it's noticed. */
+.icon-btn-active,
+.icon-btn-active:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .view-actions {
   display: flex;
   align-items: center;
@@ -419,6 +437,33 @@ button {
   position: absolute;
   right: 8px;
   pointer-events: none;
+}
+
+/* Shown while filters hide tasks, so a short list never looks like missing data. */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 4px 4px 4px 10px;
+  border-radius: 5px;
+  background: var(--bg-soft);
+  font-size: 13px;
+}
+
+.filter-summary {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.filter-summary:hover {
+  color: var(--text);
 }
 
 .loading {
@@ -548,6 +593,30 @@ button {
 
 .label {
   color: var(--text-tertiary);
+}
+
+/* Location on a line of its own, cut short like the description. */
+.task-location {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-tertiary);
+}
+
+.task-location svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.task-location span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .due-overdue { color: var(--due-overdue); }
@@ -1282,6 +1351,142 @@ button {
   color: var(--text-secondary);
 }
 
+/* ---------- Settings modal ---------- */
+
+.settings-body {
+  padding: 4px 20px 16px;
+  overflow: auto;
+}
+
+.settings-section {
+  padding: 12px 0;
+}
+
+.settings-section + .settings-section {
+  border-top: 1px solid var(--divider);
+}
+
+.settings-section h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.settings-section > p {
+  margin: -4px 0 8px;
+  font-size: 13px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.settings-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-section .settings-note {
+  margin: 0;
+  font-size: 12px;
+}
+
+.settings-switch {
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-select {
+  min-width: 200px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  padding: 4px 8px;
+  font-size: 13px;
+  outline: none;
+}
+
+.settings-select:focus {
+  border-color: var(--text-tertiary);
+}
+
+.priority-toggles {
+  display: flex;
+  gap: 4px;
+}
+
+/* Pressed: tinted in the priority's color, like the checkbox. Off: plain and gray. */
+.priority-toggle {
+  --color: var(--p4);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 8px 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.priority-toggle.p1 { --color: var(--p1); }
+.priority-toggle.p2 { --color: var(--p2); }
+.priority-toggle.p3 { --color: var(--p3); }
+
+.priority-toggle[aria-pressed='true'] {
+  border-color: var(--color);
+  background: color-mix(in srgb, var(--color) 10%, transparent);
+  color: var(--color);
+}
+
+.priority-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.field-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.field-list li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.field-list li:last-child {
+  border-bottom: none;
+}
+
+.field-list .switch {
+  flex: 1;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.field-list .field-hidden .switch {
+  color: var(--text-tertiary);
+}
+
+.field-list .icon-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+  background: none;
+}
+
+.modal-footer-spacer {
+  flex: 1;
+}
+
 /* ---------- Toast ---------- */
 
 .toast {
@@ -1345,6 +1550,15 @@ button {
   /* The share modal is short: no need to cover the whole screen. */
   .modal-small {
     height: auto;
+  }
+
+  .settings-row {
+    flex-wrap: wrap;
+  }
+
+  .settings-select {
+    min-width: 0;
+    flex: 1;
   }
 
   .modal-sidebar {
