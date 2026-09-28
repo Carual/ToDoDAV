@@ -4,18 +4,26 @@ import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } fr
 import { describeDue, formatDateTime } from '../format.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { CloseIcon, FlagIcon, HashIcon, MapPinIcon } from './icons.tsx';
+import { CloseIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon } from './icons.tsx';
 import { TaskCheckbox } from './TaskItem.tsx';
 
 interface Props {
   /** The task to show and edit; absent when adding a new one. */
   task?: Task;
+  /** The task this one is a sub-task of. */
+  parent?: Task;
+  /** Direct sub-tasks, in the order to show them. */
+  subtasks?: Task[];
   calendar: Calendar;
   onClose: () => void;
   /** Takes the edits and closes the modal at once; the save runs in the background. */
   onSave: (edits: TaskEdits) => void;
   /** Completes an open task or reopens a completed one. */
   onToggle: (task: Task) => void;
+  /** Shows another task (a parent or a sub-task) in place of this one. */
+  onOpenTask?: (task: Task) => void;
+  /** Adds an open sub-task with this name; the save runs in the background. */
+  onAddSubtask?: (summary: string) => void;
 }
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4];
@@ -80,7 +88,7 @@ function problemWith(edits: TaskEdits): string | null {
   return null;
 }
 
-export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) {
+export function TaskModal({ task, parent, subtasks = [], calendar, onClose, onSave, onToggle, onOpenTask, onAddSubtask }: Props) {
   const isNew = task === undefined;
   const [edits, setEdits] = useState(() => initialEdits(task));
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
@@ -90,12 +98,17 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
   const [showMap, setShowMap] = useState(false);
   const mapLocation = useDebounced(edits.location.trim(), MAP_DELAY_MS);
 
-  const update =(patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
+  const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
   const dirty = !sameEdits(edits, initialEdits(task));
   // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type).
   const finalEdits: TaskEdits = { ...edits, start: inMode(edits.start, allDay), due: inMode(edits.due, allDay) };
   const problem = problemWith(finalEdits);
   const canSave = dirty && !problem;
+
+  // A sub-task name typed but not added yet is unsaved work too, though Save does not add it.
+  const [addingSubtask, setAddingSubtask] = useState(false);
+  const [subtaskDraft, setSubtaskDraft] = useState('');
+  const guarded = dirty || subtaskDraft.trim() !== '';
 
   function toggleAllDay(next: boolean) {
     setAllDay(next);
@@ -126,11 +139,27 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
   useEffect(() => () => discardAnswer.current?.resolve(false), []);
 
   // Back/Forward ask too, not only the modal's own close controls.
-  useLeaveGuard(dirty, askDiscard);
+  useLeaveGuard(guarded, askDiscard);
 
-  function requestClose() {
-    if (!dirty) return onClose();
-    void askDiscard().then((discard) => discard && onClose());
+  /** Leaves the modal (to close it or to show another task), asking first if something is unsaved. */
+  function leave(then: () => void) {
+    if (!guarded) return then();
+    void askDiscard().then((discard) => discard && then());
+  }
+
+  const requestClose = () => leave(onClose);
+  const openOther = onOpenTask && ((other: Task) => leave(() => onOpenTask(other)));
+
+  function addSubtask() {
+    const summary = subtaskDraft.trim();
+    if (!summary || !onAddSubtask) return;
+    onAddSubtask(summary);
+    setSubtaskDraft(''); // stays open for the next one, like Todoist
+  }
+
+  function stopAddingSubtask() {
+    setAddingSubtask(false);
+    setSubtaskDraft('');
   }
 
   function save() {
@@ -164,6 +193,21 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
           <span className="modal-crumb">
             <HashIcon style={{ color: calendar.color }} />
             {calendar.name}
+            {parent && openOther && (
+              <>
+                <span className="modal-crumb-sep" aria-hidden="true">
+                  /
+                </span>
+                <button
+                  type="button"
+                  className="modal-crumb-link"
+                  title="Open the parent task"
+                  onClick={() => openOther(parent)}
+                >
+                  {parent.summary || 'Untitled task'}
+                </button>
+              </>
+            )}
           </span>
           <button type="button" className="icon-btn" aria-label="Close" onClick={requestClose}>
             <CloseIcon />
@@ -205,6 +249,67 @@ export function TaskModal({ task, calendar, onClose, onSave, onToggle }: Props) 
                 />
               </div>
             </div>
+
+            {task && onAddSubtask && (
+              <section className="subtasks" aria-label="Sub-tasks">
+                {subtasks.length > 0 && (
+                  <>
+                    <h3 className="subtasks-title">
+                      Sub-tasks
+                      <span className="subtasks-count">
+                        {subtasks.filter((s) => s.completed).length}/{subtasks.length}
+                      </span>
+                    </h3>
+                    <ul className="subtask-list">
+                      {subtasks.map((subtask) => (
+                        // Keyed on the state too, so the checkbox starts over if a failed save flips it back.
+                        <SubtaskRow
+                          key={`${subtask.href} ${subtask.completed}`}
+                          task={subtask}
+                          onOpen={openOther}
+                          onToggle={onToggle}
+                        />
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {addingSubtask ? (
+                  <form
+                    className="subtask-add"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      addSubtask();
+                    }}
+                  >
+                    <input
+                      value={subtaskDraft}
+                      onChange={(e) => setSubtaskDraft(e.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Escape') return;
+                        event.stopPropagation(); // closes this field, not the whole modal
+                        stopAddingSubtask();
+                      }}
+                      placeholder="Sub-task name"
+                      aria-label="Sub-task name"
+                      autoFocus
+                    />
+                    <button type="button" className="btn btn-secondary" onClick={stopAddingSubtask}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn btn-primary" disabled={!subtaskDraft.trim()}>
+                      Add
+                    </button>
+                  </form>
+                ) : (
+                  <button type="button" className="add-task" onClick={() => setAddingSubtask(true)}>
+                    <span className="add-task-icon" aria-hidden="true">
+                      <PlusIcon />
+                    </span>
+                    Add sub-task
+                  </button>
+                )}
+              </section>
+            )}
           </section>
 
           <aside className="modal-sidebar">
@@ -405,6 +510,17 @@ function DateField({ label, value, allDay, colored = false, onChange }: DateFiel
       </div>
       {summary && <span className={`due due-${colored ? summary.tone : 'later'} sidebar-note`}>{summary.label}</span>}
     </div>
+  );
+}
+
+function SubtaskRow({ task, onOpen, onToggle }: { task: Task; onOpen?: (task: Task) => void; onToggle: (task: Task) => void }) {
+  const due = task.due && describeDue(task.due);
+  return (
+    <li className={`subtask${task.completed ? ' task-done' : ''}`} onClick={() => onOpen?.(task)}>
+      <TaskCheckbox task={task} onToggle={onToggle} />
+      <span className="task-title">{task.summary || <span className="muted">Untitled task</span>}</span>
+      {due && <span className={`due due-${due.tone}`}>{due.label}</span>}
+    </li>
   );
 }
 

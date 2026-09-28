@@ -27,6 +27,8 @@ export interface Task {
   categories: string[];
   location?: string;
   url?: string;
+  /** UID of the task this one is a sub-task of (RELATED-TO). */
+  parentUid?: string;
   created?: Date;
   lastModified?: Date;
   completedAt?: Date;
@@ -83,6 +85,16 @@ function toDate(value: unknown): Date | undefined {
   return value instanceof ICAL.Time ? value.toJSDate() : undefined;
 }
 
+/** RELATED-TO without RELTYPE means PARENT (RFC 5545 3.2.15); CHILD and SIBLING links are not followed. */
+function parentUidOf(vtodo: ICAL.Component): string | undefined {
+  const parent = vtodo.getAllProperties('related-to').find((property) => {
+    const reltype = property.getParameter('reltype');
+    return !reltype || String(reltype).toUpperCase() === 'PARENT';
+  });
+  const value = parent?.getFirstValue();
+  return value ? String(value) : undefined;
+}
+
 export function parseTask(href: string, etag: string, ics: string): Task {
   const { vtodo } = parse(ics);
   const text = (name: string) => {
@@ -111,6 +123,7 @@ export function parseTask(href: string, etag: string, ics: string): Task {
       .filter(Boolean),
     location: text('location'),
     url: text('url'),
+    parentUid: parentUidOf(vtodo),
     created: toDate(vtodo.getFirstPropertyValue('created')),
     lastModified: toDate(vtodo.getFirstPropertyValue('last-modified')),
     completedAt: toDate(vtodo.getFirstPropertyValue('completed')),
@@ -192,8 +205,8 @@ function newUid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** iCalendar text for a brand-new open task, and the UID it was given. */
-export function newTaskIcs(edits: TaskEdits): { uid: string; ics: string } {
+/** iCalendar text for a brand-new open task (a sub-task when `parentUid` is given), and the UID it was given. */
+export function newTaskIcs(edits: TaskEdits, parentUid?: string): { uid: string; ics: string } {
   const uid = newUid();
   const vcalendar = new ICAL.Component('vcalendar');
   vcalendar.updatePropertyWithValue('version', '2.0');
@@ -206,6 +219,13 @@ export function newTaskIcs(edits: TaskEdits): { uid: string; ics: string } {
   vtodo.updatePropertyWithValue('created', nowUtc());
   vtodo.updatePropertyWithValue('last-modified', nowUtc());
   vtodo.updatePropertyWithValue('status', 'NEEDS-ACTION');
+  if (parentUid) {
+    // PARENT is the default, but spelling it out is what Thunderbird and Tasks.org write too.
+    const relatedTo = new ICAL.Property('related-to');
+    relatedTo.setParameter('reltype', 'PARENT');
+    relatedTo.setValue(parentUid);
+    vtodo.addProperty(relatedTo);
+  }
   writeEdits(vtodo, edits);
 
   return { uid, ics: vcalendar.toString() };

@@ -188,8 +188,8 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
     reload: () => {
       if (calendarHref) void load(calendarHref);
     },
-    create: (list: string, edits: TaskEdits) => {
-      const { uid, ics } = newTaskIcs(edits);
+    create: (list: string, edits: TaskEdits, parentUid?: string) => {
+      const { uid, ics } = newTaskIcs(edits, parentUid);
       insert(list, client.taskHref(list, uid), ics);
     },
     edit: (href: string, edits: TaskEdits) => change(href, (task) => applyEdits(task, edits)),

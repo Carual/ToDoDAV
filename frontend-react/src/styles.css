@@ -453,13 +453,60 @@ button {
 }
 
 .task {
+  --indent: 28px;
   position: relative;
   display: flex;
   align-items: flex-start;
   gap: 6px;
+  /* Sub-tasks move right, divider included, like Todoist. */
+  margin-left: calc(var(--depth, 0) * var(--indent));
   padding: 8px 0;
   border-bottom: 1px solid var(--divider);
   cursor: pointer;
+}
+
+/* Chevron in the gutter left of a task with sub-tasks: shown on hover, and always while they are hidden. */
+.task-collapse {
+  position: absolute;
+  top: 9px;
+  left: -24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.task-collapse svg {
+  transition: transform 0.15s;
+}
+
+.task:hover .task-collapse,
+.task-collapse:focus-visible,
+.task-collapse[aria-expanded='false'] {
+  opacity: 1;
+}
+
+.task-collapse:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.task-collapse[aria-expanded='false'] svg {
+  transform: rotate(-90deg);
+}
+
+@media (hover: none) {
+  .task-collapse {
+    opacity: 1;
+  }
 }
 
 .task-body {
@@ -698,8 +745,33 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   font-size: 13px;
   color: var(--text-secondary);
+}
+
+.modal-crumb-sep {
+  color: var(--text-tertiary);
+}
+
+/* The parent task, in the breadcrumb: a long name is cut short rather than pushing the close button away. */
+.modal-crumb-link {
+  min-width: 0;
+  max-width: 320px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  font-size: inherit;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-crumb-link:hover {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .modal-content {
@@ -768,6 +840,72 @@ button {
 .modal-description::placeholder,
 .modal-title::placeholder {
   color: var(--text-tertiary);
+}
+
+/* Sub-tasks under the description, lined up with the title text (past the checkbox and its gap). */
+.subtasks {
+  margin-top: 16px;
+  padding-left: 26px;
+}
+
+.subtasks-title {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.subtasks-count {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+.subtask-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.subtask {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--divider);
+  cursor: pointer;
+}
+
+.subtask .task-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.subtask .due {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 21px;
+}
+
+.subtask-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.subtask-add input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  padding: 5px 8px;
+  outline: none;
+}
+
+.subtask-add input:focus {
+  border-color: var(--text-tertiary);
 }
 
 .modal-footer {
@@ -1173,8 +1311,17 @@ button {
 /* ---------- Small screens ---------- */
 
 @media (max-width: 640px) {
+  /* A wider left edge keeps the sub-task chevron on screen. */
   .content {
-    padding: 24px 16px 80px;
+    padding: 24px 16px 80px 26px;
+  }
+
+  .task {
+    --indent: 20px;
+  }
+
+  .subtasks {
+    padding-left: 0;
   }
 
   .account-name {

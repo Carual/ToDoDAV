@@ -61,6 +61,15 @@ export function TagIcon(props: IconProps) {
   );
 }
 
+/** Two branches off one line: sub-tasks. */
+export function SubtaskIcon(props: IconProps) {
+  return (
+    <svg {...base} width={12} height={12} viewBox="0 0 12 12" {...props}>
+      <path d="M3 1.5v6A1.5 1.5 0 0 0 4.5 9H10M3 4.5h7" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function HashIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>

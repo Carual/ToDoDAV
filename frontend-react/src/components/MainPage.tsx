@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskEdits } from '../api/tasks.ts';
 import { navigate, taskPath } from '../router.ts';
+import { ancestors, buildTree, descendants, type TaskTree } from '../taskTree.ts';
 import { useTaskList } from '../useTaskList.ts';
 import { ChevronDownIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
@@ -51,6 +52,42 @@ function compareCompleted(a: Task, b: Task): number {
   return byCompleted || a.summary.localeCompare(b.summary);
 }
 
+interface Row {
+  task: Task;
+  depth: number;
+}
+
+/**
+ * Open tasks in display order, each sub-task right under its parent. An open sub-task of a completed
+ * parent (possible when another app completed the parent) shows at the top level instead.
+ */
+function openRows(tasks: Task[], tree: TaskTree, collapsed: ReadonlySet<string>): Row[] {
+  const rows: Row[] = [];
+  const visit = (task: Task, depth: number) => {
+    rows.push({ task, depth });
+    if (collapsed.has(task.uid)) return;
+    for (const child of openChildren(tree, task)) visit(child, depth + 1);
+  };
+  const isRoot = (task: Task) => !tree.parentOf(task) || tree.parentOf(task)!.completed;
+  tasks.filter((t) => !t.completed && isRoot(t)).sort(compareTasks).forEach((t) => visit(t, 0));
+  return rows;
+}
+
+const openChildren = (tree: TaskTree, task: Task) => tree.childrenOf(task).filter((t) => !t.completed).sort(compareTasks);
+
+/** Direct sub-tasks: open ones first in list order, then completed ones. */
+const sortedChildren = (tree: TaskTree, task: Task) => [
+  ...openChildren(tree, task),
+  ...tree.childrenOf(task).filter((t) => t.completed).sort(compareCompleted),
+];
+
+function subtaskCount(tree: TaskTree, task: Task) {
+  const children = tree.childrenOf(task);
+  return { done: children.filter((t) => t.completed).length, total: children.length };
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+
 interface Props {
   session: Session;
   /** UID of the task whose modal is open, from the URL (/tasks/<uid>). */
@@ -87,12 +124,30 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     onWriteError: ({ message, retry }) => showToast({ message, action: retry && { label: 'Retry', run: retry } }),
   });
   const { tasks } = list;
+  const tree = useMemo(() => buildTree(tasks), [tasks]);
+  /** UIDs of the tasks whose sub-tasks are hidden in the list. */
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+
+  function toggleCollapsed(uid: string) {
+    const next = new Set(collapsed);
+    if (!next.delete(uid)) next.add(uid);
+    setCollapsed(next);
+  }
 
   function setCompleted(task: Task, completed: boolean) {
-    list.setCompleted(task.href, completed);
-    if (completed) {
-      showToast({ message: 'Task completed', action: { label: 'Undo', run: () => list.setCompleted(task.href, false) } });
+    if (!completed) {
+      // A sub-task reopened under a completed parent would be cut off from it: reopen the parents too.
+      for (const t of [task, ...ancestors(tree, task).filter((a) => a.completed)]) list.setCompleted(t.href, false);
+      return;
     }
+    // Like Todoist, completing a task completes its open sub-tasks; Undo reopens exactly those.
+    const done = [task, ...descendants(tree, task).filter((t) => !t.completed)];
+    for (const t of done) list.setCompleted(t.href, true);
+    const extra = done.length - 1;
+    showToast({
+      message: extra > 0 ? `Task and ${plural(extra, 'sub-task')} completed` : 'Task completed',
+      action: { label: 'Undo', run: () => done.forEach((t) => list.setCompleted(t.href, false)) },
+    });
   }
 
   function selectCalendar(href: string) {
@@ -107,6 +162,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
 
   const toggleTask = (task: Task) => setCompleted(task, !task.completed);
 
+  const openTaskPage = (task: Task) => navigate(taskPath(task.uid));
   const closeTask = () => navigate('/tasks');
 
   function saveEdits(task: Task, edits: TaskEdits) {
@@ -120,7 +176,12 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     setCreating(false);
   }
 
-  const openTasks = tasks.filter((t) => !t.completed).sort(compareTasks);
+  function addSubtask(parent: Task, summary: string) {
+    if (!calendarHref) return;
+    list.create(calendarHref, { summary, description: '', priority: 4, categories: [], location: '' }, parent.uid);
+  }
+
+  const openTasks = openRows(tasks, tree, collapsed);
   const completedTasks = tasks.filter((t) => t.completed).sort(compareCompleted);
   const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
   const modalOpen = creating || sharing || openTask !== undefined;
@@ -230,11 +291,17 @@ export function MainPage({ session, openUid, onLogout }: Props) {
               <>
                 {openTasks.length > 0 && (
                   <ul className="task-list">
-                    {openTasks.map((task) => (
+                    {openTasks.map(({ task, depth }) => (
                       <TaskItem
                         key={task.href}
                         task={task}
-                        onOpen={(t) => navigate(taskPath(t.uid))}
+                        depth={depth}
+                        subtasks={subtaskCount(tree, task)}
+                        collapsed={collapsed.has(task.uid)}
+                        onToggleCollapsed={
+                          openChildren(tree, task).length > 0 ? () => toggleCollapsed(task.uid) : undefined
+                        }
+                        onOpen={openTaskPage}
                         onToggle={toggleTask}
                       />
                     ))}
@@ -267,12 +334,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                     {showCompleted && (
                       <ul className="task-list">
                         {completedTasks.map((task) => (
-                          <TaskItem
-                            key={task.href}
-                            task={task}
-                            onOpen={(t) => navigate(taskPath(t.uid))}
-                            onToggle={toggleTask}
-                          />
+                          <TaskItem key={task.href} task={task} onOpen={openTaskPage} onToggle={toggleTask} />
                         ))}
                       </ul>
                     )}
@@ -299,10 +361,14 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           // Remount only when the content changes (a reload or a failed save), not when a save just confirms it.
           key={`${openTask.href} ${openTask.ics}`}
           task={openTask}
+          parent={tree.parentOf(openTask)}
+          subtasks={sortedChildren(tree, openTask)}
           calendar={calendar}
           onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
           onToggle={toggleTask}
+          onOpenTask={openTaskPage}
+          onAddSubtask={(summary) => addSubtask(openTask, summary)}
         />
       )}
 
