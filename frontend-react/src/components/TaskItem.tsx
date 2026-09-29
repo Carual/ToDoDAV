@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } fro
 import type { Calendar } from '../api/caldav.ts';
 import type { Task } from '../api/tasks.ts';
 import { describeDue, describeRepeat } from '../format.ts';
+import { InlineMarkdown, previewLine } from '../markdown.tsx';
 import { BLOCK_FIELDS, type RowField } from '../viewSettings.ts';
 import { CalendarIcon, CheckIcon, ChevronDownIcon, HashIcon, MapPinIcon, PencilIcon, RepeatIcon, SubtaskIcon, TagIcon } from './icons.tsx';
 
@@ -65,8 +66,14 @@ export function RepeatMark({ task }: { task: Task }) {
 function renderField(field: RowField, task: Task, subtasks: Props['subtasks']): ReactNode {
   switch (field) {
     case 'description': {
-      const firstLine = task.description.split('\n')[0];
-      return firstLine && <div className="task-desc">{firstLine}</div>;
+      const firstLine = previewLine(task.description);
+      return (
+        firstLine && (
+          <div className="task-desc">
+            <InlineMarkdown text={firstLine} />
+          </div>
+        )
+      );
     }
     case 'location':
       return (
@@ -167,7 +174,9 @@ export function TaskItem({ task, depth = 0, subtasks, fields, project, collapsed
       )}
       <TaskCheckbox task={task} onToggle={onToggle} />
       <div className="task-body">
-        <div className="task-title">{task.summary || <span className="muted">Untitled task</span>}</div>
+        <div className="task-title">
+          {task.summary ? <InlineMarkdown text={task.summary} /> : <span className="muted">Untitled task</span>}
+        </div>
         <TaskDetails task={task} fields={fields} subtasks={subtasks} />
       </div>
       <div className="task-actions">

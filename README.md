@@ -23,6 +23,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - Add tasks with the "+ Add task" row or the **Q** key.
 - Sub-tasks: add them from a task's page, see them nested under their parent (collapsible), and completing a parent completes its sub-tasks. They use the standard `RELATED-TO` property, so sub-tasks made in Tasks.org, Thunderbird and similar apps show up too.
 - Edit title, description, start date, due date (all-day or with a time), priority and labels. Ctrl/⌘+Enter saves.
+- Markdown in titles and descriptions, as in Todoist: **bold**, *italic*, ~~strikethrough~~, `code` and links in both, plus headings, lists, quotes and code blocks in descriptions.
 - Import and export a list (Settings → Import or export), either as an iCalendar `.ics` file or as a Todoist CSV that Todoist can import (and read Todoist's CSV exports and template). Everything happens in your browser.
 - Optional read-only calendar feeds for Google Calendar, with a share button that gives you the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
 

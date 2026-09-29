@@ -25,6 +25,8 @@
   --toast-bg: #282828;
   --toast-text: #ffffff;
   --toast-action: #ff7066;
+  --link: #246fe0;
+  --code-bg: rgba(0, 0, 0, 0.06);
 
   color-scheme: light;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple Color Emoji', Helvetica, Arial, sans-serif;
@@ -59,6 +61,8 @@
     --shadow-modal: 0 15px 50px 0 rgba(0, 0, 0, 0.7);
     --shadow-popover: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 20px rgba(0, 0, 0, 0.5);
     --toast-bg: #3a3a3a;
+    --link: #5297ff;
+    --code-bg: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
   }
 }
@@ -1235,6 +1239,129 @@ button {
 .modal-description::placeholder,
 .modal-title::placeholder {
   color: var(--text-tertiary);
+}
+
+/* The formatted name and description, which turn into their editor when clicked. */
+.markdown-view {
+  cursor: text;
+  overflow-wrap: anywhere;
+}
+
+/* Text with formatting or links: clicks on it are for its links and for selecting; empty space and the pencil edit. */
+.markdown-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.markdown-field .markdown-view {
+  flex: 1;
+  min-width: 0;
+}
+
+.markdown-view-formatted {
+  cursor: auto;
+}
+
+/* Centered on the first line of the text beside it. */
+.markdown-edit {
+  margin-top: 6px;
+}
+
+/* ---------- Markdown (task names and descriptions) ---------- */
+
+.md-link {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md-code,
+.markdown pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+
+.md-code {
+  padding: 1px 4px;
+}
+
+.markdown > :first-child {
+  margin-top: 0;
+}
+
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown p {
+  margin: 0 0 8px;
+  white-space: pre-line; /* single line breaks stay, as in Todoist */
+}
+
+.markdown li > p {
+  margin: 0;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  margin: 12px 0 4px;
+  line-height: 1.3;
+}
+
+.markdown h1 {
+  font-size: 20px;
+}
+
+.markdown h2 {
+  font-size: 17px;
+}
+
+.markdown h3 {
+  font-size: 15px;
+}
+
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 14px;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 8px;
+  padding-left: 24px;
+}
+
+.markdown li > ul,
+.markdown li > ol {
+  margin-bottom: 0;
+}
+
+.markdown blockquote {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.markdown pre {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.markdown hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--border);
 }
 
 /* Sub-tasks under the description, lined up with the title text (past the checkbox and its gap). */

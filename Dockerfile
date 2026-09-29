@@ -22,6 +22,7 @@ COPY package.json ./
 COPY --from=deps /app/node_modules node_modules
 COPY --from=build /app/dist dist
 COPY backend backend
+COPY shared shared
 USER bun
 EXPOSE 3852
 # /api/status answers over plain HTTP even in production, so it works from inside the container.

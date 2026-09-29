@@ -3,11 +3,12 @@ import type { Calendar } from '../api/caldav.ts';
 import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } from '../api/tasks.ts';
 import { download, fileName } from '../download.ts';
 import { describeDue, formatDateTime } from '../format.ts';
+import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../markdown.tsx';
 import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../repeat.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { DatePicker } from './DatePicker.tsx';
-import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
+import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PencilIcon, PlusIcon, RepeatIcon } from './icons.tsx';
 import { RepeatField } from './RepeatField.tsx';
 import { Select } from './Select.tsx';
 import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
@@ -126,6 +127,12 @@ export function TaskModal({
   const [edits, setEdits] = useState(() => initialEdits(task));
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
   const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
+  // The name and description show as formatted Markdown, and turn into their editor when clicked, like Todoist.
+  // A new task starts with the name being typed.
+  const [editing, setEditing] = useState<'summary' | 'description' | null>(isNew ? 'summary' : null);
+  // Switching to another window keeps the field open, so the browser gives it back its focus on return.
+  const stopEditing = () => document.hasFocus() && setEditing(null);
+  const titleRef = useRef<HTMLInputElement>(null);
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
   const mapLocation = useDebounced(edits.location.trim(), MAP_DELAY_MS);
 
@@ -250,13 +257,21 @@ export function TaskModal({
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  // A field opened for editing takes the focus, with the caret at the end of its text.
+  useEffect(() => {
+    const field = editing === 'summary' ? titleRef.current : editing === 'description' ? descriptionRef.current : null;
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [editing]);
+
   // Grow the description box with its content, like Todoist.
   useEffect(() => {
     const textarea = descriptionRef.current;
     if (!textarea) return;
     textarea.style.height = 'auto';
     textarea.style.height = `${textarea.scrollHeight}px`;
-  }, [edits.description]);
+  }, [edits.description, editing]);
 
   const message = dirty ? problem : null;
 
@@ -278,7 +293,7 @@ export function TaskModal({
                   title="Open the parent task"
                   onClick={() => openOther(parent)}
                 >
-                  {parent.summary || 'Untitled task'}
+                  {plainText(parent.summary) || 'Untitled task'}
                 </button>
               </>
             )}
@@ -304,23 +319,47 @@ export function TaskModal({
                 <span className={`task-check task-check-static p${edits.priority}`} aria-hidden="true" />
               )}
               <div className="modal-editor">
-                <input
-                  className="modal-title"
-                  value={edits.summary}
-                  onChange={(e) => update({ summary: e.target.value })}
-                  placeholder="Task name"
-                  aria-label="Task name"
-                  autoFocus
-                />
-                <textarea
-                  ref={descriptionRef}
-                  className="modal-description"
-                  value={edits.description}
-                  onChange={(e) => update({ description: e.target.value })}
-                  placeholder="Description"
-                  aria-label="Description"
-                  rows={1}
-                />
+                {editing === 'summary' ? (
+                  <input
+                    ref={titleRef}
+                    className="modal-title"
+                    value={edits.summary}
+                    onChange={(e) => update({ summary: e.target.value })}
+                    onBlur={stopEditing}
+                    placeholder="Task name"
+                    aria-label="Task name"
+                  />
+                ) : (
+                  <MarkdownView
+                    className="modal-title"
+                    label="Task name"
+                    formatted={hasMarkdown(edits.summary)}
+                    onEdit={() => setEditing('summary')}
+                  >
+                    {edits.summary && <InlineMarkdown text={edits.summary} />}
+                  </MarkdownView>
+                )}
+                {editing === 'description' ? (
+                  <textarea
+                    ref={descriptionRef}
+                    className="modal-description"
+                    value={edits.description}
+                    onChange={(e) => update({ description: e.target.value })}
+                    onBlur={stopEditing}
+                    placeholder="Description"
+                    aria-label="Description"
+                    rows={1}
+                  />
+                ) : (
+                  <MarkdownView
+                    className="modal-description markdown"
+                    label="Description"
+                    formatted={hasMarkdown(edits.description, true)}
+                    onEdit={() => setEditing('description')}
+                  >
+                    {edits.description.trim() && <Markdown text={edits.description} />}
+                  </MarkdownView>
+                )}
               </div>
             </div>
 
@@ -552,7 +591,7 @@ export function TaskModal({
               className="icon-btn"
               aria-label="Download as .ics"
               title="Download as .ics (the saved version)"
-              onClick={() => download(fileName(task.summary, 'ics', 'task'), task.ics, 'text/calendar')}
+              onClick={() => download(fileName(plainText(task.summary), 'ics', 'task'), task.ics, 'text/calendar')}
             >
               <DownloadIcon />
             </button>
@@ -646,7 +685,9 @@ function SubtaskRow({ task, onOpen, onToggle }: { task: Task; onOpen?: (task: Ta
   return (
     <li className={`subtask${task.completed ? ' task-done' : ''}`} onClick={() => onOpen?.(task)}>
       <TaskCheckbox task={task} onToggle={onToggle} />
-      <span className="task-title">{task.summary || <span className="muted">Untitled task</span>}</span>
+      <span className="task-title">
+        {task.summary ? <InlineMarkdown text={task.summary} /> : <span className="muted">Untitled task</span>}
+      </span>
       {due && (
         <span className={`due due-${due.tone}`}>
           {due.label}
@@ -655,6 +696,82 @@ function SubtaskRow({ task, onOpen, onToggle }: { task: Task; onOpen?: (task: Ta
       )}
     </li>
   );
+}
+
+interface MarkdownViewProps {
+  className: string;
+  /** What the field is, also its placeholder when empty. */
+  label: string;
+  /** Whether the text has formatting or links, which a click on it is then left to. */
+  formatted: boolean;
+  onEdit: () => void;
+  children: ReactNode;
+}
+
+/**
+ * The formatted text of a field. Plain text opens its editor when focused (a click, or Tab). Text with formatting
+ * or links only does on a click in empty space, so its links can be clicked and its text selected; a pencil
+ * beside it opens the editor too.
+ */
+function MarkdownView({ className, label, formatted, onEdit, children }: MarkdownViewProps) {
+  if (formatted) {
+    return (
+      <div className="markdown-field">
+        <div
+          className={`${className} markdown-view markdown-view-formatted`}
+          onClick={(event) => {
+            // A drag that selected text was for copying it. Clicks on links never get here.
+            if (!window.getSelection()?.isCollapsed) return;
+            if (!isOverText(event.clientX, event.clientY)) onEdit();
+          }}
+        >
+          {children}
+        </div>
+        <button
+          type="button"
+          className="icon-btn icon-btn-small markdown-edit"
+          aria-label={`Edit ${label.toLowerCase()}`}
+          title={`Edit ${label.toLowerCase()}`}
+          onClick={onEdit}
+        >
+          <PencilIcon />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div
+      className={`${className} markdown-view`}
+      tabIndex={0}
+      onFocus={(event) => event.target === event.currentTarget && onEdit()}
+    >
+      {children || <span className="muted">{label}</span>}
+    </div>
+  );
+}
+
+/**
+ * Whether the point is on a character rather than in empty space. The element under it can't tell: a paragraph
+ * spans the whole width, past the end of a short line. So this finds the caret position there and checks whether
+ * the character on either side of it covers the point.
+ */
+function isOverText(x: number, y: number): boolean {
+  const position = document.caretPositionFromPoint?.(x, y);
+  const range = position ? undefined : document.caretRangeFromPoint?.(x, y);
+  const node = position?.offsetNode ?? range?.startContainer;
+  const offset = position?.offset ?? range?.startOffset ?? 0;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+  const length = node.textContent?.length ?? 0;
+  const character = document.createRange();
+  for (const start of [offset - 1, offset]) {
+    if (start < 0 || start >= length) continue;
+    character.setStart(node, start);
+    character.setEnd(node, start + 1);
+    for (const rect of character.getClientRects()) {
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+    }
+  }
+  return false;
 }
 
 function hasDetails(task: Task): boolean {

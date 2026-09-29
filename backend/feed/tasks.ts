@@ -2,6 +2,7 @@ import express, { type Router } from 'express';
 import ICAL from 'ical.js';
 import { basicAuth } from '../auth.ts';
 import type { Config } from '../config.ts';
+import { markdownToText, plainText } from '../../shared/markdown.ts';
 
 const DAV = 'DAV:';
 const CALDAV = 'urn:ietf:params:xml:ns:caldav';
@@ -19,8 +20,11 @@ const REPORT_BODY =
   '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter>' +
   '</c:calendar-query>';
 
-/** VTODO properties that mean the same in a VEVENT. Everything else (PRIORITY, CATEGORIES, X-...) is dropped. */
-const COPIED = ['uid', 'dtstamp', 'sequence', 'created', 'last-modified', 'description', 'location', 'url', 'class', 'rrule', 'rdate', 'exdate', 'recurrence-id'];
+/**
+ * VTODO properties that mean the same in a VEVENT. SUMMARY and DESCRIPTION are rewritten (their Markdown as
+ * plain text); everything else (PRIORITY, CATEGORIES, X-...) is dropped.
+ */
+const COPIED = ['uid', 'dtstamp', 'sequence', 'created', 'last-modified', 'location', 'url', 'class', 'rrule', 'rdate', 'exdate', 'recurrence-id'];
 const REPEAT = new Set(['rrule', 'rdate', 'exdate']);
 
 /**
@@ -177,6 +181,7 @@ function toEventCalendar(list: TaskList): string {
  * - Cancelled: left out. For an override of a repeating task it stays as a cancelled occurrence instead,
  *   because leaving it out would bring back the master's occurrence on that date.
  * - Completed: kept, with "✓ " before the title, and without its repeat.
+ * - Title and description: their Markdown as plain text, links as "text (address)".
  * - Start before due (same value type): spans start to due. Otherwise it sits on the due date alone.
  * - Timed: an instant (DTEND = DTSTART). All-day: DTEND is the next day, since DTEND is exclusive.
  * - Reminders (VALARM) are kept; the event is "free" so it never blocks time.
@@ -201,8 +206,12 @@ function toEvent(vtodo: ICAL.Component): ICAL.Component | undefined {
   }
   if (!event.hasProperty('dtstamp')) event.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(new Date(), true));
 
-  const summary = String(vtodo.getFirstPropertyValue('summary') ?? '');
+  // Calendars show Markdown as typed, asterisks and all. Links keep their address, which Google Calendar
+  // turns back into a link in the description and which can at least be copied from the title.
+  const summary = plainText(String(vtodo.getFirstPropertyValue('summary') ?? ''), true);
   event.addPropertyWithValue('summary', completed ? `✓ ${summary}` : summary);
+  const description = String(vtodo.getFirstPropertyValue('description') ?? '');
+  if (description.trim()) event.addPropertyWithValue('description', markdownToText(description));
 
   const startProperty = vtodo.getFirstProperty('dtstart');
   const start = startProperty?.getFirstValue();
