@@ -139,6 +139,14 @@ export function TaskModal({
   const [subtaskDraft, setSubtaskDraft] = useState('');
   const guarded = dirty || subtaskDraft.trim() !== '';
 
+  /** Most tasks only have a due date: the start date's field shows only for tasks that have one, or on request. */
+  const [showStart, setShowStart] = useState(() => task?.start !== undefined);
+
+  function toggleStart(next: boolean) {
+    setShowStart(next);
+    if (!next && edits.start) changeDate('start', undefined);
+  }
+
   function toggleAllDay(next: boolean) {
     setAllDay(next);
     update({ start: inMode(edits.start, next), due: inMode(edits.due, next) });
@@ -380,14 +388,23 @@ export function TaskModal({
             <SidebarItem
               title="Dates"
               action={
-                <label className="switch">
-                  <input type="checkbox" checked={allDay} onChange={(e) => toggleAllDay(e.target.checked)} />
-                  <span className="switch-track" aria-hidden="true" />
-                  All day
-                </label>
+                <div className="sidebar-switches">
+                  <label className="switch">
+                    <input type="checkbox" checked={allDay} onChange={(e) => toggleAllDay(e.target.checked)} />
+                    <span className="switch-track" aria-hidden="true" />
+                    All day
+                  </label>
+                  <label className="switch">
+                    <input type="checkbox" checked={showStart} onChange={(e) => toggleStart(e.target.checked)} />
+                    <span className="switch-track" aria-hidden="true" />
+                    Start date
+                  </label>
+                </div>
               }
             >
-              <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => changeDate('start', start)} />
+              {showStart && (
+                <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => changeDate('start', start)} />
+              )}
               <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => changeDate('due', due)} />
               <RepeatField value={edits.recurrence} anchor={repeatAnchor} allDay={allDay} onChange={changeRepeat} />
               {edits.recurrence && !edits.start && !edits.due && (

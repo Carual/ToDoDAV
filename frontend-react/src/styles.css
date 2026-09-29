@@ -1094,6 +1094,11 @@ button {
   user-select: none;
 }
 
+.sidebar-switches {
+  display: flex;
+  gap: 12px;
+}
+
 .switch input {
   position: absolute;
   opacity: 0;
@@ -1223,6 +1228,20 @@ button {
 
 .repeat-field select {
   width: 100%;
+}
+
+/* The label on the left, the switch on the right, like "All day" above it. */
+.repeat-header {
+  display: flex;
+  justify-content: space-between;
+}
+
+.repeat-header .date-field-label {
+  margin: 0;
+}
+
+.repeat-header + select {
+  margin-top: 4px;
 }
 
 .repeat-custom {

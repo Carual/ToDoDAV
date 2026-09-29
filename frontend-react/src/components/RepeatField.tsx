@@ -43,7 +43,7 @@ const validForm = (form: RepeatForm) =>
   form.interval >= 1 && (form.end !== 'count' || form.count >= 1) && (form.end !== 'until' || form.until !== '');
 
 /**
- * "Repeat": Google Calendar's quick choices for the task's date, and a custom form (every N days, weeks,
+ * "Repeat": a switch, and while it is on, Google Calendar's quick choices for the task's date and a custom form (every N days, weeks,
  * months or years; which weekdays; which day of the month; when it ends). A rule from another app that the
  * choices don't cover stays selected as it is until another one is picked.
  */
@@ -58,7 +58,7 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
   }, [value, anchor.date]); // the date, not the object holding it, which is new on every render
 
   const presetIndex = value === undefined ? -1 : presets.findIndex((preset) => sameRule(preset.rule, value, anchor));
-  const selected = form ? 'custom' : value === undefined ? 'none' : presetIndex >= 0 ? `preset:${presetIndex}` : 'current';
+  const selected = form ? 'custom' : presetIndex >= 0 ? `preset:${presetIndex}` : 'current';
 
   function choose(option: string) {
     if (option === 'custom') {
@@ -69,7 +69,13 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
     }
     if (option === 'current') return; // the rule as it already is
     setForm(null);
-    onChange(option === 'none' ? undefined : presets[Number(option.slice('preset:'.length))]!.rule);
+    onChange(presets[Number(option.slice('preset:'.length))]!.rule);
+  }
+
+  /** On starts with the first choice (every day); off drops the rule and closes the custom form. */
+  function toggle(on: boolean) {
+    setForm(null);
+    onChange(on ? presets[0]!.rule : undefined);
   }
 
   function edit(patch: Partial<RepeatForm>) {
@@ -82,17 +88,23 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
 
   return (
     <div className="date-field repeat-field">
-      <span className="date-field-label">Repeat</span>
-      <select className="sidebar-text" value={selected} onChange={(e) => choose(e.target.value)} aria-label="Repeat">
-        <option value="none">Does not repeat</option>
-        {presets.map((preset, index) => (
-          <option key={preset.rule} value={`preset:${index}`}>
-            {preset.label}
-          </option>
-        ))}
-        {selected === 'current' && value && <option value="current">{describeRepeat(value, anchor)}</option>}
-        <option value="custom">Custom…</option>
-      </select>
+      <label className="repeat-header switch">
+        <span className="date-field-label">Repeat</span>
+        <input type="checkbox" checked={value !== undefined} onChange={(e) => toggle(e.target.checked)} />
+        <span className="switch-track" aria-hidden="true" />
+      </label>
+
+      {value !== undefined && (
+        <select className="sidebar-text" value={selected} onChange={(e) => choose(e.target.value)} aria-label="Repeat">
+          {presets.map((preset, index) => (
+            <option key={preset.rule} value={`preset:${index}`}>
+              {preset.label}
+            </option>
+          ))}
+          {selected === 'current' && <option value="current">{describeRepeat(value, anchor)}</option>}
+          <option value="custom">Custom…</option>
+        </select>
+      )}
 
       {form && (
         <div className="repeat-custom">
