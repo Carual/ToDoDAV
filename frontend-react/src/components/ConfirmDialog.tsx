@@ -4,21 +4,28 @@ interface Props {
   title: string;
   message: string;
   confirmLabel: string;
+  /** Leaves the confirm button shown but unusable (the message should say why). */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  /** A third choice between Cancel and the confirm button, such as "Discard" next to "Save". */
+  alternative?: { label: string; onClick: () => void };
 }
 
 /** A small in-app replacement for window.confirm, drawn above whatever modal asked. */
-export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ title, message, confirmLabel, confirmDisabled = false, onConfirm, onCancel, alternative }: Props) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   // Focus the confirm button (so Enter confirms, like Todoist) and give focus back when done.
+  // When it can't be used, Cancel takes the focus: Enter must never pick the destructive choice.
   useEffect(() => {
     const previous = document.activeElement;
-    confirmRef.current?.focus();
+    (confirmDisabled ? cancelRef : confirmRef).current?.focus();
     return () => {
       if (previous instanceof HTMLElement) previous.focus();
     };
+    // Only on opening: the focus shouldn't jump while the dialog is up.
   }, []);
 
   useEffect(() => {
@@ -43,10 +50,15 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
           <p>{message}</p>
         </div>
         <footer className="confirm-footer">
-          <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          <button ref={cancelRef} type="button" className="btn btn-secondary" onClick={onCancel}>
             Cancel
           </button>
-          <button ref={confirmRef} type="button" className="btn btn-primary" onClick={onConfirm}>
+          {alternative && (
+            <button type="button" className="btn btn-secondary" onClick={alternative.onClick}>
+              {alternative.label}
+            </button>
+          )}
+          <button ref={confirmRef} type="button" className="btn btn-primary" onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </button>
         </footer>

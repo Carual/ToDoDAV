@@ -19,7 +19,10 @@ interface Props {
   subtasks?: Task[];
   calendar: Calendar;
   onClose: () => void;
-  /** Takes the edits and closes the modal at once; the save runs in the background. */
+  /**
+   * Takes the edits; the save runs in the background. The modal leaves on its own afterwards (closing, or
+   * showing another task), so this must not navigate.
+   */
   onSave: (edits: TaskEdits) => void;
   /** Completes an open task or reopens a completed one; a repeating task moves to its next date instead. */
   onToggle: (task: Task) => void;
@@ -159,36 +162,44 @@ export function TaskModal({
     update({ recurrence, start: addDaysTo(edits.start, shift), due: addDaysTo(due, shift) });
   }
 
-  // One question at a time: every way out (close controls, Back/Forward) waits on the same answer.
-  const [askingDiscard, setAskingDiscard] = useState(false);
-  const discardAnswer = useRef<{ promise: Promise<boolean>; resolve: (discard: boolean) => void } | null>(null);
+  // One question at a time: every way out (close controls, Back/Forward) waits on the same answer,
+  // which only says whether to go on leaving. Saving, when chosen, is done by the dialog itself.
+  const [askingLeave, setAskingLeave] = useState(false);
+  const leaveAnswer = useRef<{ promise: Promise<boolean>; resolve: (leave: boolean) => void } | null>(null);
 
-  const askDiscard = useCallback((): Promise<boolean> => {
-    if (!discardAnswer.current) {
-      let resolve!: (discard: boolean) => void;
+  const askLeave = useCallback((): Promise<boolean> => {
+    if (!leaveAnswer.current) {
+      let resolve!: (leave: boolean) => void;
       const promise = new Promise<boolean>((r) => (resolve = r));
-      discardAnswer.current = { promise, resolve };
-      setAskingDiscard(true);
+      leaveAnswer.current = { promise, resolve };
+      setAskingLeave(true);
     }
-    return discardAnswer.current.promise;
+    return leaveAnswer.current.promise;
   }, []);
 
-  function answerDiscard(discard: boolean) {
-    discardAnswer.current?.resolve(discard);
-    discardAnswer.current = null;
-    setAskingDiscard(false);
+  function answerLeave(leave: boolean) {
+    leaveAnswer.current?.resolve(leave);
+    leaveAnswer.current = null;
+    setAskingLeave(false);
   }
 
   // Closing for another reason while asking must still settle the question (the router waits on it).
-  useEffect(() => () => discardAnswer.current?.resolve(false), []);
+  useEffect(() => () => leaveAnswer.current?.resolve(false), []);
 
   // Back/Forward ask too, not only the modal's own close controls.
-  useLeaveGuard(guarded, askDiscard);
+  useLeaveGuard(guarded, askLeave);
 
   /** Leaves the modal (to close it or to show another task), asking first if something is unsaved. */
   function leave(then: () => void) {
     if (!guarded) return then();
-    void askDiscard().then((discard) => discard && then());
+    void askLeave().then((leave) => leave && then());
+  }
+
+  /** Everything unsaved, sub-task name included, is kept, and then the modal is left as asked. */
+  function saveAndLeave() {
+    if (dirty) onSave(finalEdits);
+    if (subtaskDraft.trim()) addSubtask();
+    answerLeave(true);
   }
 
   const requestClose = () => leave(onClose);
@@ -207,12 +218,14 @@ export function TaskModal({
   }
 
   function save() {
-    if (canSave) onSave(finalEdits);
+    if (!canSave) return;
+    onSave(finalEdits);
+    onClose();
   }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (askingDiscard) return; // the dialog on top owns the keyboard
+      if (askingLeave) return; // the dialog on top owns the keyboard
       if (event.key === 'Escape') requestClose();
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) save();
     };
@@ -386,20 +399,22 @@ export function TaskModal({
             </SidebarItem>
 
             <SidebarItem title="Priority">
-              <label className={`priority-select p${edits.priority}`}>
-                <FlagIcon />
-                <select
-                  value={edits.priority}
-                  onChange={(e) => update({ priority: Number(e.target.value) as Priority })}
-                  aria-label="Priority"
-                >
-                  {PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      Priority {p}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="priority-picker" role="radiogroup" aria-label="Priority">
+                {PRIORITIES.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={edits.priority === p}
+                    className={`priority-option p${p}`}
+                    aria-label={`Priority ${p}`}
+                    title={`Priority ${p}`}
+                    onClick={() => update({ priority: p })}
+                  >
+                    <FlagIcon />
+                  </button>
+                ))}
+              </div>
             </SidebarItem>
 
             <SidebarItem title="Labels">
@@ -518,13 +533,23 @@ export function TaskModal({
         </footer>
       </div>
 
-      {askingDiscard && (
+      {askingLeave && (
         <ConfirmDialog
-          title="Discard unsaved changes?"
-          message={isNew ? 'This task has not been added yet.' : 'The changes you made to this task will be lost.'}
-          confirmLabel="Discard"
-          onConfirm={() => answerDiscard(true)}
-          onCancel={() => answerDiscard(false)}
+          title={isNew ? 'Add this task?' : 'Save changes?'}
+          message={
+            dirty && problem
+              ? `${problem} Fix it to save, or discard the changes.`
+              : isNew
+                ? 'This task has not been added yet.'
+                : dirty
+                  ? 'The changes you made to this task have not been saved.'
+                  : 'The sub-task you typed has not been added.'
+          }
+          confirmLabel={isNew ? 'Add task' : 'Save'}
+          confirmDisabled={dirty && Boolean(problem)}
+          onConfirm={saveAndLeave}
+          onCancel={() => answerLeave(false)}
+          alternative={{ label: 'Discard', onClick: () => answerLeave(true) }}
         />
       )}
     </div>

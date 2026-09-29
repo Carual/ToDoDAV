@@ -227,14 +227,16 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   const openTaskPage = (task: Task) => navigate(taskPath(task.uid));
   const closeTask = () => navigate('/tasks');
 
+  // No navigation here: the modal leaves on its own after saving (closing, opening another task,
+  // or letting Back/Forward go on).
   function saveEdits(task: Task, edits: TaskEdits) {
     list.edit(task.href, edits);
-    closeTask();
   }
 
   function createTask(edits: TaskEdits) {
     if (!calendarHref) return;
     list.create(calendarHref, edits);
+    // Not a route, so Back/Forward alone wouldn't close it; left open, it could add the task twice.
     setCreating(false);
   }
 

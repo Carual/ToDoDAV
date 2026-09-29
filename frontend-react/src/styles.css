@@ -1143,8 +1143,7 @@ button {
   font-size: 13px;
 }
 
-.sidebar-text,
-.priority-select select {
+.sidebar-text {
   border: 1px solid var(--border);
   border-radius: 5px;
   background: var(--bg);
@@ -1157,8 +1156,7 @@ button {
   width: 100%;
 }
 
-.sidebar-text:focus,
-.priority-select select:focus {
+.sidebar-text:focus {
   border-color: var(--text-tertiary);
 }
 
@@ -1325,19 +1323,42 @@ button {
   color: var(--due-overdue);
 }
 
-.priority-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--p4);
+.priority-picker {
+  display: flex;
+  gap: 4px;
 }
 
-.priority-select.p1 { color: var(--p1); }
-.priority-select.p2 { color: var(--p2); }
-.priority-select.p3 { color: var(--p3); }
+/* Every flag in its own color; the chosen one framed and tinted, like the checkbox. */
+.priority-option {
+  --color: var(--p4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: var(--color);
+}
 
-.priority-select select {
-  color: var(--text);
+.priority-option.p1 { --color: var(--p1); }
+.priority-option.p2 { --color: var(--p2); }
+.priority-option.p3 { --color: var(--p3); }
+
+.priority-option:hover {
+  background: var(--bg-hover);
+}
+
+.priority-option[aria-checked='true'] {
+  border-color: var(--color);
+  background: color-mix(in srgb, var(--color) 12%, transparent);
+}
+
+.priority-option:focus-visible {
+  outline: 2px solid var(--p3);
+  outline-offset: 1px;
 }
 
 .details {
