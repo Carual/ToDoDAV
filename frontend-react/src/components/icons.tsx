@@ -165,6 +165,15 @@ export function TransferIcon(props: IconProps) {
   );
 }
 
+/** An arrow into a tray: download. */
+export function DownloadIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 4.5v10M8.5 11 12 14.5 15.5 11M5.5 15.5v3h13v-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>

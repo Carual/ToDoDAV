@@ -3,6 +3,7 @@ import type { Calendar, CalDavClient } from '../api/caldav.ts';
 import { icsToTasks, tasksToIcs, type ImportItem, type ParsedImport } from '../api/icsFile.ts';
 import type { Task } from '../api/tasks.ts';
 import { tasksToTodoist, todoistToTasks } from '../api/todoist.ts';
+import { download, fileName } from '../download.ts';
 import { readSetting, saveSetting } from '../viewSettings.ts';
 import { CloseIcon, TransferIcon } from './icons.tsx';
 import { Spinner } from './Spinner.tsx';
@@ -38,19 +39,6 @@ interface Props {
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : 'Something went wrong.');
-
-/** A file name without the characters Windows and macOS refuse. */
-const fileName = (name: string, extension: string) => `${name.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'tasks'}.${extension}`;
-
-function download(name: string, text: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: `${type};charset=utf-8` }));
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  // Revoked later: some browsers still read the blob after click() returns.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
 
 /** Runs `run` on every item, at most `limit` at a time, so a big import doesn't flood the server. */
 async function eachLimited<T>(items: T[], limit: number, run: (item: T) => Promise<void>) {

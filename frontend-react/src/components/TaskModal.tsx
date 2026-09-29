@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Calendar } from '../api/caldav.ts';
 import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } from '../api/tasks.ts';
+import { download, fileName } from '../download.ts';
 import { describeDue, formatDateTime } from '../format.ts';
 import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../repeat.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { CheckIcon, CloseIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
+import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
 import { RepeatField } from './RepeatField.tsx';
 import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
 
@@ -490,6 +491,18 @@ export function TaskModal({
           <span className="modal-footer-message" role="alert">
             {message}
           </span>
+          {task && (
+            // The file as stored on the server (reminders, repeats and overrides included), not the unsaved edits.
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Download as .ics"
+              title="Download as .ics (the saved version)"
+              onClick={() => download(fileName(task.summary, 'ics', 'task'), task.ics, 'text/calendar')}
+            >
+              <DownloadIcon />
+            </button>
+          )}
           <button type="button" className="btn btn-secondary" onClick={requestClose}>
             Cancel
           </button>
