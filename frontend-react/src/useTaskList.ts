@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalDavError, type CalDavClient, type Calendar } from './api/caldav.ts';
 import {
   applyEdits,
@@ -39,8 +39,8 @@ function mapLists(lists: Lists, update: (tasks: Task[]) => Task[]): Lists {
 
 interface Options {
   client: CalDavClient;
-  /** The list on screen. */
-  calendarHref: string | undefined;
+  /** The lists on screen: one, or every list in the "All" view. */
+  calendarHrefs: string[];
   onLogout: () => void;
   onWriteError: (error: WriteError) => void;
 }
@@ -50,13 +50,14 @@ interface Options {
  * background. If the save fails, the task goes back to what the server has. Lists seen before are shown
  * from memory while a fresh copy loads, so switching lists is instant too.
  */
-export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Options) {
+export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: Options) {
   const [lists, setListsState] = useState<Lists>({});
   // The same lists, readable right after a change (before React re-renders) and from old closures like Undo.
   const listsRef = useRef<Lists>({});
   /** Lists fetched from the server at least once, not only built up locally. */
   const [fetched, setFetched] = useState<ReadonlySet<string>>(() => new Set());
-  const [loadError, setLoadError] = useState<{ href: string; message: string } | null>(null);
+  /** Why the last load of a list failed, per list href. */
+  const [loadErrors, setLoadErrors] = useState<Readonly<Record<string, string>>>({});
   const loadIds = useRef(new Map<string, number>());
   /**
    * Saves still on their way, per task href; each resolves to the task as the server then has it. Saves to
@@ -88,7 +89,11 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
     async (href: string) => {
       const id = (loadIds.current.get(href) ?? 0) + 1;
       loadIds.current.set(href, id);
-      setLoadError((error) => (error?.href === href ? null : error));
+      setLoadErrors((current) => {
+        if (!(href in current)) return current;
+        const { [href]: _cleared, ...others } = current;
+        return others;
+      });
       try {
         const fresh = await client.listTasks(href);
         if (loadIds.current.get(href) !== id) return; // a newer load of this list wins
@@ -97,15 +102,29 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
       } catch (err) {
         if (err instanceof CalDavError && err.status === 401) return callbacks.current.onLogout();
         if (loadIds.current.get(href) !== id) return;
-        setLoadError({ href, message: err instanceof Error ? err.message : 'Could not load the tasks.' });
+        const message = err instanceof Error ? err.message : 'Could not load the tasks.';
+        setLoadErrors((current) => ({ ...current, [href]: message }));
       }
     },
     [client, setLists, withPending],
   );
 
+  // Hrefs never hold a newline, so the joined key only changes when the lists on screen do.
+  const shownKey = calendarHrefs.join('\n');
+  const shown = useMemo(() => (shownKey ? shownKey.split('\n') : []), [shownKey]);
+
   useEffect(() => {
-    if (calendarHref) void load(calendarHref);
-  }, [calendarHref, load]);
+    for (const href of shown) void load(href);
+  }, [shown, load]);
+
+  /** The tasks on screen, one group per list, so sub-tasks only nest within their own list. */
+  const groups = useMemo(() => shown.map((href) => lists[href] ?? NO_TASKS), [shown, lists]);
+  const tasks = useMemo(() => groups.flat(), [groups]);
+  /** Which list each task on screen is in, by task href. */
+  const listByTask = useMemo(
+    () => new Map(shown.flatMap((list) => (lists[list] ?? NO_TASKS).map((t) => [t.href, list] as const))),
+    [shown, lists],
+  );
 
   const find = (href: string) => Object.values(listsRef.current).flat().find((t) => t.href === href);
   const listOf = (href: string) =>
@@ -194,14 +213,17 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
   );
 
   return {
-    tasks: (calendarHref && lists[calendarHref]) || NO_TASKS,
-    /** The list on screen is known, from the server or from memory. */
-    loaded: calendarHref !== undefined && calendarHref in lists,
-    /** The list on screen came from the server at least once, so a task missing from it is really elsewhere. */
-    fetched: calendarHref !== undefined && fetched.has(calendarHref),
-    loadError: loadError && loadError.href === calendarHref ? loadError.message : null,
+    tasks,
+    groups,
+    /** The list a task on screen is in. */
+    listOf: (task: Task) => listByTask.get(task.href),
+    /** The lists on screen are known, from the server or from memory. */
+    loaded: shown.length > 0 && shown.every((href) => href in lists),
+    /** The lists on screen came from the server at least once, so a task missing from them is really elsewhere. */
+    fetched: shown.length > 0 && shown.every((href) => fetched.has(href)),
+    loadError: shown.map((href) => loadErrors[href]).find((message) => message !== undefined) ?? null,
     reload: () => {
-      if (calendarHref) void load(calendarHref);
+      for (const href of shown) void load(href);
     },
     /** Fetches a list again, on screen or not (after an import wrote to it directly). */
     refresh: (href: string) => void load(href),

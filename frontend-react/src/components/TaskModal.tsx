@@ -9,6 +9,7 @@ import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { DatePicker } from './DatePicker.tsx';
 import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
 import { RepeatField } from './RepeatField.tsx';
+import { Select } from './Select.tsx';
 import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
 import { TimeField } from './TimeField.tsx';
 
@@ -19,13 +20,16 @@ interface Props {
   parent?: Task;
   /** Direct sub-tasks, in the order to show them. */
   subtasks?: Task[];
+  /** The task's list; for a new task, the one chosen at first. */
   calendar: Calendar;
+  /** The lists a new task can go in; with more than one, the modal lets the user pick. */
+  calendars?: Calendar[];
   onClose: () => void;
   /**
-   * Takes the edits; the save runs in the background. The modal leaves on its own afterwards (closing, or
-   * showing another task), so this must not navigate.
+   * Takes the edits and the list the task is in (for a new task, the one picked); the save runs in the
+   * background. The modal leaves on its own afterwards (closing, or showing another task), so this must not navigate.
    */
-  onSave: (edits: TaskEdits) => void;
+  onSave: (edits: TaskEdits, calendarHref: string) => void;
   /** Completes an open task or reopens a completed one; a repeating task moves to its next date instead. */
   onToggle: (task: Task) => void;
   /** Completes a repeating task for good instead of moving it to its next date. */
@@ -106,7 +110,8 @@ export function TaskModal({
   task,
   parent,
   subtasks = [],
-  calendar,
+  calendar: initialCalendar,
+  calendars = [],
   onClose,
   onSave,
   onToggle,
@@ -116,6 +121,8 @@ export function TaskModal({
   showMap = false,
 }: Props) {
   const isNew = task === undefined;
+  const [calendar, setCalendar] = useState(initialCalendar);
+  const canPickCalendar = isNew && calendars.length > 1;
   const [edits, setEdits] = useState(() => initialEdits(task));
   const [allDay, setAllDay] = useState(() => !task?.start?.time && !task?.due?.time);
   const [labelsText, setLabelsText] = useState(() => task?.categories.join(', ') ?? '');
@@ -207,7 +214,7 @@ export function TaskModal({
 
   /** Everything unsaved, sub-task name included, is kept, and then the modal is left as asked. */
   function saveAndLeave() {
-    if (dirty) onSave(finalEdits);
+    if (dirty) onSave(finalEdits, calendar.href);
     if (subtaskDraft.trim()) addSubtask();
     answerLeave(true);
   }
@@ -229,7 +236,7 @@ export function TaskModal({
 
   function save() {
     if (!canSave) return;
-    onSave(finalEdits);
+    onSave(finalEdits, calendar.href);
     onClose();
   }
 
@@ -381,10 +388,23 @@ export function TaskModal({
 
           <aside className="modal-sidebar">
             <SidebarItem title="Project">
-              <span className="sidebar-value">
-                <HashIcon style={{ color: calendar.color }} />
-                {calendar.name}
-              </span>
+              {canPickCalendar ? (
+                <Select
+                  aria-label="Project"
+                  value={calendar.href}
+                  onChange={(href) => setCalendar(calendars.find((c) => c.href === href) ?? calendar)}
+                  options={calendars.map((c) => ({
+                    value: c.href,
+                    label: c.name,
+                    icon: <HashIcon className="select-icon" style={{ color: c.color }} />,
+                  }))}
+                />
+              ) : (
+                <span className="sidebar-value">
+                  <HashIcon style={{ color: calendar.color }} />
+                  {calendar.name}
+                </span>
+              )}
             </SidebarItem>
 
             <SidebarItem

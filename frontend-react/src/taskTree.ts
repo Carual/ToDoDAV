@@ -36,6 +36,15 @@ export function buildTree(tasks: Task[]): TaskTree {
   };
 }
 
+/** One tree over several lists, each built on its own: a task never nests under a parent in another list. */
+export function joinTrees(trees: TaskTree[]): TaskTree {
+  if (trees.length === 1) return trees[0]!;
+  return {
+    parentOf: (task) => trees.map((tree) => tree.parentOf(task)).find((parent) => parent !== undefined),
+    childrenOf: (task) => trees.flatMap((tree) => tree.childrenOf(task)),
+  };
+}
+
 /** Every task below this one, at any depth. */
 export function descendants(tree: TaskTree, task: Task): Task[] {
   return tree.childrenOf(task).flatMap((child) => [child, ...descendants(tree, child)]);

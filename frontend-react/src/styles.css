@@ -907,6 +907,31 @@ button {
   color: var(--text-tertiary);
 }
 
+/* The task's list at the bottom right of the row, as in Todoist's cross-project views ("Work #"). */
+.task-project {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 35%;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-tertiary);
+}
+
+.task-project svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.task-project-name {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .task-location svg {
   width: 12px;
   height: 12px;

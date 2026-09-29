@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Calendar } from '../api/caldav.ts';
 import type { Task, TaskEdits } from '../api/tasks.ts';
 import { describeDue } from '../format.ts';
 import { navigate, taskPath } from '../router.ts';
-import { ancestors, buildTree, descendants, type TaskTree } from '../taskTree.ts';
+import { ancestors, buildTree, descendants, joinTrees, type TaskTree } from '../taskTree.ts';
 import { useTaskList } from '../useTaskList.ts';
 import {
   DEFAULT_SETTINGS,
@@ -18,7 +19,7 @@ import {
 } from '../viewSettings.ts';
 import { FilterModal } from './FilterModal.tsx';
 import { ImportExportModal } from './ImportExportModal.tsx';
-import { ChevronDownIcon, FilterIcon, GearIcon, HashIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
+import { ChevronDownIcon, FilterIcon, GearIcon, HashIcon, LayersIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { Select } from './Select.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
@@ -28,6 +29,8 @@ import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
 
 const SELECTED_KEY = 'tododav.calendar';
+/** The "All" view's value where a list href would go; hrefs start with / or a scheme, so it can't clash. */
+const ALL = 'all';
 const SHOW_COMPLETED_KEY = 'tododav.showCompleted';
 
 interface Toast {
@@ -126,12 +129,19 @@ interface Props {
 export function MainPage({ session, openUid, onLogout }: Props) {
   const { client, calendars, config } = session;
   const canShare = config.feeds.tasks || config.feeds.events;
-  const [calendarHref, setCalendarHref] = useState(() => {
+  // "All" only makes sense with several lists, and is where the app starts then, like Todoist's all-projects views.
+  const canShowAll = calendars.length > 1;
+  const [selected, setSelected] = useState(() => {
     const saved = readSetting(SELECTED_KEY);
-    return calendars.find((c) => c.href === saved)?.href ?? calendars[0]?.href;
+    if (saved === ALL && canShowAll) return ALL;
+    return calendars.find((c) => c.href === saved)?.href ?? (canShowAll ? ALL : calendars[0]?.href);
   });
   const [showCompleted, setShowCompleted] = useState(() => readSetting(SHOW_COMPLETED_KEY) === 'true');
-  const calendar = calendars.find((c) => c.href === calendarHref);
+  const allView = selected === ALL;
+  /** The single list on screen; undefined in the "All" view. */
+  const calendar = calendars.find((c) => c.href === selected);
+  const shownHrefs = allView ? calendars.map((c) => c.href) : calendar ? [calendar.href] : [];
+  const hasLists = calendars.length > 0;
 
   const [creating, setCreating] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -159,12 +169,14 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   // Every change shows at once; a failed save puts the task back and says so here.
   const list = useTaskList({
     client,
-    calendarHref,
+    calendarHrefs: shownHrefs,
     onLogout,
     onWriteError: ({ message, retry }) => showToast({ message, action: retry && { label: 'Retry', run: retry } }),
   });
   const { tasks } = list;
-  const tree = useMemo(() => buildTree(tasks), [tasks]);
+  const { groups } = list;
+  const tree = useMemo(() => joinTrees(groups.map(buildTree)), [groups]);
+  const calendarOf = (task: Task): Calendar | undefined => calendars.find((c) => c.href === list.listOf(task));
   /** UIDs of the tasks whose sub-tasks are hidden in the list. */
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
 
@@ -213,8 +225,9 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     });
   }
 
+  /** Shows one list, or every list with ALL. */
   function selectCalendar(href: string) {
-    setCalendarHref(href);
+    setSelected(href);
     saveSetting(SELECTED_KEY, href);
   }
 
@@ -234,14 +247,15 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     list.edit(task.href, edits);
   }
 
-  function createTask(edits: TaskEdits) {
-    if (!calendarHref) return;
+  function createTask(edits: TaskEdits, calendarHref: string) {
     list.create(calendarHref, edits);
     // Not a route, so Back/Forward alone wouldn't close it; left open, it could add the task twice.
     setCreating(false);
   }
 
   function addSubtask(parent: Task, summary: string) {
+    // In the parent's own list: sub-tasks only nest under a parent in the same list.
+    const calendarHref = list.listOf(parent);
     if (!calendarHref) return;
     list.create(calendarHref, { summary, description: '', priority: 4, categories: [], location: '' }, parent.uid);
   }
@@ -259,15 +273,20 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   const openTasks = openRows(tasks, tree, collapsed, view);
   const completedTasks = tasks.filter((t) => t.completed && view.matches(t)).sort(compareCompleted);
   const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
+  const openTaskCalendar = openTask && calendarOf(openTask);
+  /** Where a new task goes unless the modal picks another list. */
+  const newTaskCalendar = calendar ?? calendars[0];
   const modalOpen = creating || sharing || editingSettings || editingFilters || transferring || openTask !== undefined;
 
   // A task link can point to another list (the URL has only the UID): look there and switch to it.
   const taskMissing = openUid !== undefined && !openTask && list.fetched;
   const { locate } = list;
+  const shownKey = shownHrefs.join('\n');
   useEffect(() => {
     if (!taskMissing || openUid === undefined) return;
     let cancelled = false;
-    void locate(openUid, calendars.filter((c) => c.href !== calendarHref)).then((found) => {
+    const shown = shownKey.split('\n');
+    void locate(openUid, calendars.filter((c) => !shown.includes(c.href))).then((found) => {
       if (cancelled) return;
       if (found) return selectCalendar(found);
       showToast({ message: 'Task not found' });
@@ -276,7 +295,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [taskMissing, openUid, calendarHref, calendars, locate]);
+  }, [taskMissing, openUid, shownKey, calendars, locate]);
 
   // "Q" opens the new-task modal, like Todoist's quick add (not while typing or with a modal open).
   useEffect(() => {
@@ -284,13 +303,13 @@ export function MainPage({ session, openUid, onLogout }: Props) {
       const target = event.target as HTMLElement;
       const typing = target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
       if (event.key.toLowerCase() !== 'q' || event.ctrlKey || event.metaKey || event.altKey || typing) return;
-      if (modalOpen || !calendar) return;
+      if (modalOpen || !hasLists) return;
       event.preventDefault();
       setCreating(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modalOpen, calendar]);
+  }, [modalOpen, hasLists]);
 
   return (
     <div className="app">
@@ -320,7 +339,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
       </header>
 
       <main className="content">
-        {!calendar ? (
+        {!hasLists ? (
           <div className="empty">
             <h2>No task lists found</h2>
             <p>Create a calendar with tasks (VTODO) on your CalDAV server, then log in again.</p>
@@ -329,7 +348,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           <>
             <div className="view-header">
               <div className="view-title">
-                <h1>{calendar.name}</h1>
+                <h1>{calendar?.name ?? 'All'}</h1>
                 <button
                   type="button"
                   className={`icon-btn${filtered ? ' icon-btn-active' : ''}`}
@@ -341,7 +360,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                 </button>
               </div>
               <div className="view-actions">
-                {canShare && (
+                {canShare && calendar && (
                   <button
                     type="button"
                     className="icon-btn"
@@ -352,17 +371,20 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                     <ShareIcon />
                   </button>
                 )}
-                {calendars.length > 1 && (
+                {canShowAll && (
                   <Select
                     className="calendar-select"
                     aria-label="Task list"
-                    value={calendar.href}
+                    value={selected ?? ALL}
                     onChange={selectCalendar}
-                    options={calendars.map((c) => ({
-                      value: c.href,
-                      label: c.name,
-                      icon: <HashIcon className="select-icon" style={{ color: c.color }} />,
-                    }))}
+                    options={[
+                      { value: ALL, label: 'All', icon: <LayersIcon className="select-icon" /> },
+                      ...calendars.map((c) => ({
+                        value: c.href,
+                        label: c.name,
+                        icon: <HashIcon className="select-icon" style={{ color: c.color }} />,
+                      })),
+                    ]}
                   />
                 )}
               </div>
@@ -401,6 +423,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                         depth={depth}
                         subtasks={subtaskCount(tree, task)}
                         fields={fields}
+                        project={allView ? calendarOf(task) : undefined}
                         collapsed={collapsed.has(task.uid)}
                         onToggleCollapsed={
                           hasShownChildren(tree, task, view) ? () => toggleCollapsed(task.uid) : undefined
@@ -421,12 +444,12 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                   (filtered ? (
                     <div className="empty">
                       <h2>No matching tasks</h2>
-                      <p>No open tasks in this list match the filters.</p>
+                      <p>No open tasks {allView ? 'in any list' : 'in this list'} match the filters.</p>
                     </div>
                   ) : (
                     <div className="empty">
                       <h2>All clear</h2>
-                      <p>No open tasks in this list.</p>
+                      <p>No open tasks {allView ? 'in any list' : 'in this list'}.</p>
                     </div>
                   ))}
                 {completedTasks.length > 0 && (
@@ -448,6 +471,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                             key={task.href}
                             task={task}
                             fields={fields}
+                            project={allView ? calendarOf(task) : undefined}
                             onOpen={openTaskPage}
                             onToggle={toggleTask}
                           />
@@ -462,10 +486,11 @@ export function MainPage({ session, openUid, onLogout }: Props) {
         )}
       </main>
 
-      {calendar && creating && (
+      {newTaskCalendar && creating && (
         <TaskModal
           key="new"
-          calendar={calendar}
+          calendar={newTaskCalendar}
+          calendars={calendars}
           onClose={() => setCreating(false)}
           onSave={createTask}
           onToggle={toggleTask}
@@ -473,14 +498,14 @@ export function MainPage({ session, openUid, onLogout }: Props) {
         />
       )}
 
-      {calendar && !creating && openTask && (
+      {openTaskCalendar && !creating && openTask && (
         <TaskModal
           // Remount only when the content changes (a reload or a failed save), not when a save just confirms it.
           key={`${openTask.href} ${openTask.ics}`}
           task={openTask}
           parent={tree.parentOf(openTask)}
           subtasks={sortedChildren(tree, openTask, view.compare)}
-          calendar={calendar}
+          calendar={openTaskCalendar}
           onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
           onToggle={toggleTask}
@@ -500,7 +525,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           settings={settings}
           onChange={changeSettings}
           onImportExport={
-            calendarHref
+            hasLists
               ? () => {
                   setEditingSettings(false);
                   setTransferring(true);
@@ -511,15 +536,16 @@ export function MainPage({ session, openUid, onLogout }: Props) {
         />
       )}
 
-      {calendarHref && transferring && (
+      {newTaskCalendar && transferring && (
         <ImportExportModal
           client={client}
           calendars={calendars}
-          calendarHref={calendarHref}
+          calendarHref={newTaskCalendar.href}
           compare={view.compare}
           onImported={(href) => {
             list.refresh(href);
-            selectCalendar(href);
+            // The "All" view already shows the list imported into.
+            if (!allView) selectCalendar(href);
           }}
           onClose={() => setTransferring(false)}
         />

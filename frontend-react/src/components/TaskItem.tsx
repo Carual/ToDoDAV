@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import type { Calendar } from '../api/caldav.ts';
 import type { Task } from '../api/tasks.ts';
 import { describeDue, describeRepeat } from '../format.ts';
 import { BLOCK_FIELDS, type RowField } from '../viewSettings.ts';
-import { CalendarIcon, CheckIcon, ChevronDownIcon, MapPinIcon, PencilIcon, RepeatIcon, SubtaskIcon, TagIcon } from './icons.tsx';
+import { CalendarIcon, CheckIcon, ChevronDownIcon, HashIcon, MapPinIcon, PencilIcon, RepeatIcon, SubtaskIcon, TagIcon } from './icons.tsx';
 
 interface Props {
   task: Task;
@@ -12,6 +13,8 @@ interface Props {
   subtasks?: { done: number; total: number };
   /** The details to show under the title, in order (from the settings). */
   fields: RowField[];
+  /** The list the task is in, shown only where tasks of several lists mix (the "All" view). */
+  project?: Calendar;
   /** Whether the open sub-tasks under this row are hidden; only for rows that have some. */
   collapsed?: boolean;
   onToggleCollapsed?: () => void;
@@ -140,7 +143,7 @@ function TaskDetails({ task, fields, subtasks }: { task: Task; fields: RowField[
   return <>{lines}</>;
 }
 
-export function TaskItem({ task, depth = 0, subtasks, fields, collapsed, onToggleCollapsed, onOpen, onToggle }: Props) {
+export function TaskItem({ task, depth = 0, subtasks, fields, project, collapsed, onToggleCollapsed, onOpen, onToggle }: Props) {
   return (
     <li
       className={`task${task.completed ? ' task-done' : ''}`}
@@ -181,6 +184,12 @@ export function TaskItem({ task, depth = 0, subtasks, fields, collapsed, onToggl
           <PencilIcon />
         </button>
       </div>
+      {project && (
+        <span className="task-project" title={`In ${project.name}`}>
+          <span className="task-project-name">{project.name}</span>
+          <HashIcon style={{ color: project.color }} />
+        </span>
+      )}
     </li>
   );
 }

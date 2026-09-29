@@ -92,6 +92,16 @@ export function HashIcon(props: IconProps) {
   );
 }
 
+/** Stacked layers: every list at once (the "All" view). */
+export function LayersIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path d="M8 2.5 14 5.5 8 8.5 2 5.5 8 2.5Z" stroke="currentColor" strokeLinejoin="round" />
+      <path d="m2 8.25 6 3 6-3M2 11l6 3 6-3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function PlusIcon(props: IconProps) {
   return (
     <svg {...base} width={13} height={13} viewBox="0 0 13 13" {...props}>
