@@ -6,9 +6,11 @@ import { describeDue, formatDateTime } from '../format.ts';
 import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../repeat.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
+import { DatePicker } from './DatePicker.tsx';
 import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
 import { RepeatField } from './RepeatField.tsx';
 import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
+import { TimeField } from './TimeField.tsx';
 
 interface Props {
   /** The task to show and edit; absent when adding a new one. */
@@ -583,27 +585,24 @@ interface DateFieldProps {
 }
 
 function DateField({ label, value, allDay, colored = false, onChange }: DateFieldProps) {
-  const summary = value && describeDue(value);
   return (
     <div className="date-field">
       <span className="date-field-label">{label}</span>
       <div className="date-field-row">
-        {allDay ? (
-          <input
-            type="date"
-            value={value?.date ?? ''}
-            onChange={(e) => onChange(e.target.value ? { date: e.target.value } : undefined)}
-            aria-label={label}
-          />
-        ) : (
-          <input
-            type="datetime-local"
-            value={value ? `${value.date}T${value.time ?? DEFAULT_TIME}` : ''}
-            onChange={(e) => {
-              const [date, time] = e.target.value.split('T');
-              onChange(date ? { date, time: time?.slice(0, 5) || DEFAULT_TIME } : undefined);
-            }}
-            aria-label={label}
+        <DatePicker
+          value={value?.date}
+          // The time counts too: a due time already passed today is overdue.
+          tone={colored && value ? describeDue(value).tone : undefined}
+          clearable
+          aria-label={label}
+          onChange={(date) => onChange(!date ? undefined : allDay ? { date } : { date, time: value?.time ?? DEFAULT_TIME })}
+        />
+        {!allDay && (
+          <TimeField
+            value={value && (value.time ?? DEFAULT_TIME)}
+            aria-label={`${label} time`}
+            // A time alone means today, as in Todoist.
+            onChange={(time) => onChange({ date: value?.date ?? todayDate().date, time })}
           />
         )}
         {value && (
@@ -618,7 +617,6 @@ function DateField({ label, value, allDay, colored = false, onChange }: DateFiel
           </button>
         )}
       </div>
-      {summary && <span className={`due due-${colored ? summary.tone : 'later'} sidebar-note`}>{summary.label}</span>}
     </div>
   );
 }

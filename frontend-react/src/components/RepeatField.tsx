@@ -12,6 +12,8 @@ import {
   type Frequency,
   type RepeatForm,
 } from '../repeat.ts';
+import { DatePicker } from './DatePicker.tsx';
+import { Select, type SelectOption } from './Select.tsx';
 
 interface Props {
   /** The RRULE value, or undefined when the task doesn't repeat. */
@@ -39,7 +41,13 @@ const DAY_NAMES: Record<string, string> = {
   SU: 'Sunday',
 };
 
-const validForm = (form: RepeatForm) =>
+const ENDS: SelectOption<RepeatForm['end']>[] = [
+  { value: 'never', label: 'Never' },
+  { value: 'until', label: 'On' },
+  { value: 'count', label: 'After' },
+];
+
+const validForm =(form: RepeatForm) =>
   form.interval >= 1 && (form.end !== 'count' || form.count >= 1) && (form.end !== 'until' || form.until !== '');
 
 /**
@@ -95,15 +103,17 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
       </label>
 
       {value !== undefined && (
-        <select className="sidebar-text" value={selected} onChange={(e) => choose(e.target.value)} aria-label="Repeat">
-          {presets.map((preset, index) => (
-            <option key={preset.rule} value={`preset:${index}`}>
-              {preset.label}
-            </option>
-          ))}
-          {selected === 'current' && <option value="current">{describeRepeat(value, anchor)}</option>}
-          <option value="custom">Custom…</option>
-        </select>
+        <Select<string>
+          className="repeat-select"
+          value={selected}
+          onChange={choose}
+          aria-label="Repeat"
+          options={[
+            ...presets.map((preset, index) => ({ value: `preset:${index}`, label: preset.label })),
+            ...(selected === 'current' ? [{ value: 'current', label: describeRepeat(value, anchor) }] : []),
+            { value: 'custom', label: 'Custom…' },
+          ]}
+        />
       )}
 
       {form && (
@@ -119,18 +129,12 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
               onChange={(e) => edit({ interval: Math.min(999, Math.max(0, Math.trunc(Number(e.target.value)))) })}
               aria-label="Repeat every"
             />
-            <select
-              className="sidebar-text"
+            <Select
               value={form.freq}
-              onChange={(e) => edit({ freq: e.target.value as Frequency })}
+              onChange={(freq) => edit({ freq })}
               aria-label="Repeat unit"
-            >
-              {FREQUENCIES.map((freq) => (
-                <option key={freq} value={freq}>
-                  {UNITS[freq][form.interval === 1 ? 0 : 1]}
-                </option>
-              ))}
-            </select>
+              options={FREQUENCIES.map((freq) => ({ value: freq, label: UNITS[freq][form.interval === 1 ? 0 : 1] }))}
+            />
           </div>
 
           {form.freq === 'WEEKLY' && (
@@ -158,39 +162,31 @@ export function RepeatField({ value, anchor, allDay, onChange }: Props) {
           )}
 
           {form.freq === 'MONTHLY' && (
-            <select
-              className="sidebar-text repeat-wide"
+            <Select
+              className="repeat-select"
               value={form.monthly}
-              onChange={(e) => edit({ monthly: e.target.value as RepeatForm['monthly'] })}
+              onChange={(monthly) => edit({ monthly })}
               aria-label="Day of the month"
-            >
-              {monthlyChoices(anchor).map((choice) => (
-                <option key={choice.value} value={choice.value}>
-                  {choice.label}
-                </option>
-              ))}
-            </select>
+              options={monthlyChoices(anchor)}
+            />
           )}
 
           <div className="repeat-row">
             <span>Ends</span>
-            <select
-              className="sidebar-text"
+            <Select
+              className="repeat-ends"
               value={form.end}
-              onChange={(e) => edit({ end: e.target.value as RepeatForm['end'] })}
+              onChange={(end) => edit({ end })}
               aria-label="Ends"
-            >
-              <option value="never">Never</option>
-              <option value="until">On</option>
-              <option value="count">After</option>
-            </select>
+              options={ENDS}
+            />
             {form.end === 'until' && (
-              <input
-                type="date"
-                className="sidebar-text"
-                value={form.until}
+              <DatePicker
+                value={form.until || undefined}
                 min={anchor.date}
-                onChange={(e) => edit({ until: e.target.value })}
+                longLabel
+                placeholder="Pick a date"
+                onChange={(until) => until && edit({ until })}
                 aria-label="Last date"
               />
             )}

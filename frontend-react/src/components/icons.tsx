@@ -189,3 +189,88 @@ export function ChevronUpIcon(props: IconProps) {
     </svg>
   );
 }
+
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path d="M9.5 4.5 6 8l3.5 3.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path d="M6.5 4.5 10 8l-3.5 3.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** A calendar page showing the day of the month: "Today" in the date picker, as in Todoist. */
+export function TodayIcon({ day, ...props }: IconProps & { day: number }) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <rect x="2" y="2.5" width="12" height="11.5" rx="2" stroke="currentColor" />
+      <path d="M2 5.5h12" stroke="currentColor" />
+      <text x="8" y="12.4" textAnchor="middle" fontSize="6.5" fontWeight="700" fill="currentColor">
+        {day}
+      </text>
+    </svg>
+  );
+}
+
+export function SunIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <circle cx="8" cy="8" r="2.75" stroke="currentColor" />
+      <path
+        d="M8 1.5v1.25M8 13.25v1.25M1.5 8h1.25M13.25 8h1.25M3.4 3.4l.9.9M11.7 11.7l.9.9M3.4 12.6l.9-.9M11.7 4.3l.9-.9"
+        stroke="currentColor"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** A sofa: the weekend. */
+export function WeekendIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path
+        d="M3.5 7V5.5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2V7M2.5 7.5a1 1 0 0 1 2 0v1.5h7V7.5a1 1 0 0 1 2 0V11a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1V7.5ZM4 12v1.5M12 12v1.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** A calendar with an arrow: next week. */
+export function NextWeekIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path d="M14 7.5V4.5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2V12a2 2 0 0 0 2 2h4M2 5.5h12" stroke="currentColor" strokeLinecap="round" />
+      <path d="M10 12h4.5M12.75 10.25 14.5 12l-1.75 1.75" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** A circle struck through: no date. */
+export function NoDateIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <circle cx="8" cy="8" r="5.5" stroke="currentColor" />
+      <path d="m4.2 11.8 7.6-7.6" stroke="currentColor" />
+    </svg>
+  );
+}
+
+export function ClockIcon(props: IconProps) {
+  return (
+    <svg {...base} width={12} height={12} viewBox="0 0 12 12" {...props}>
+      <circle cx="6" cy="6" r="4.75" stroke="currentColor" />
+      <path d="M6 3.5V6l1.75 1.25" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}

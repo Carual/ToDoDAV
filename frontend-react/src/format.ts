@@ -9,7 +9,8 @@ function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
-function formatTime(time: string): string {
+/** "09:30" in the user's locale: "9:30 AM", "9:30"... */
+export function formatTime(time: string): string {
   const [hours = 0, minutes = 0] = time.split(':').map(Number);
   return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }

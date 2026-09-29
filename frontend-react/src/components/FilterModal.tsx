@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import type { Priority } from '../api/tasks.ts';
 import { ALL_PRIORITIES, DEFAULT_SETTINGS, DUE_FILTER_NAMES, filtersActive, type DueFilter, type Filters } from '../viewSettings.ts';
-import { CloseIcon, FilterIcon, FlagIcon } from './icons.tsx';
+import { CloseIcon, FilterIcon, FlagIcon, TagIcon } from './icons.tsx';
+import { Select } from './Select.tsx';
 
 interface Props {
   filters: Filters;
@@ -72,35 +73,29 @@ export function FilterModal({ filters, labels, onChange, onClose }: Props) {
                 })}
               </div>
             </div>
-            <label className="settings-row">
+            <div className="settings-row">
               <span className="settings-label">Due date</span>
-              <select
+              <Select
                 className="settings-select"
+                aria-label="Due date"
                 value={filters.due}
-                onChange={(e) => update({ due: e.target.value as DueFilter })}
-              >
-                {Object.entries(DUE_FILTER_NAMES).map(([value, name]) => (
-                  <option key={value} value={value}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="settings-row">
+                onChange={(due) => update({ due })}
+                options={(Object.entries(DUE_FILTER_NAMES) as [DueFilter, string][]).map(([value, label]) => ({ value, label }))}
+              />
+            </div>
+            <div className="settings-row">
               <span className="settings-label">Label</span>
-              <select
+              <Select
                 className="settings-select"
+                aria-label="Label"
                 value={filters.label ?? ''}
-                onChange={(e) => update({ label: e.target.value || undefined })}
-              >
-                <option value="">Any label</option>
-                {labelOptions.map((label) => (
-                  <option key={label} value={label}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={(label) => update({ label: label || undefined })}
+                options={[
+                  { value: '', label: 'Any label' },
+                  ...labelOptions.map((label) => ({ value: label, label, icon: <TagIcon className="select-icon" /> })),
+                ]}
+              />
+            </div>
           </section>
         </div>
 

@@ -5,12 +5,18 @@ import type { Task } from '../api/tasks.ts';
 import { tasksToTodoist, todoistToTasks } from '../api/todoist.ts';
 import { download, fileName } from '../download.ts';
 import { readSetting, saveSetting } from '../viewSettings.ts';
-import { CloseIcon, TransferIcon } from './icons.tsx';
+import { CloseIcon, HashIcon, TransferIcon } from './icons.tsx';
+import { Select, type SelectOption } from './Select.tsx';
 import { Spinner } from './Spinner.tsx';
 
 const FORMAT_KEY = 'tododav.transferFormat';
 
 type Format = 'ics' | 'todoist';
+
+const FORMATS: SelectOption<Format>[] = [
+  { value: 'ics', label: 'iCalendar (.ics)' },
+  { value: 'todoist', label: 'Todoist (CSV)' },
+];
 
 type ImportState =
   | { step: 'idle' }
@@ -164,34 +170,33 @@ export function ImportExportModal({ client, calendars, calendarHref, compare, on
 
         <div className="settings-body">
           <section className="settings-section">
-            <label className="settings-row">
+            <div className="settings-row">
               <span className="settings-label">Format</span>
-              <select
+              <Select
                 className="settings-select"
+                aria-label="Format"
                 value={format}
                 disabled={busy}
-                onChange={(e) => setFormat(e.target.value as Format)}
-              >
-                <option value="ics">iCalendar (.ics)</option>
-                <option value="todoist">Todoist (CSV)</option>
-              </select>
-            </label>
+                onChange={setFormat}
+                options={FORMATS}
+              />
+            </div>
             {calendars.length > 1 && (
-              <label className="settings-row">
+              <div className="settings-row">
                 <span className="settings-label">Task list</span>
-                <select
+                <Select
                   className="settings-select"
+                  aria-label="Task list"
                   value={calendar.href}
                   disabled={busy}
-                  onChange={(e) => selectList(e.target.value)}
-                >
-                  {calendars.map((c) => (
-                    <option key={c.href} value={c.href}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={selectList}
+                  options={calendars.map((c) => ({
+                    value: c.href,
+                    label: c.name,
+                    icon: <HashIcon className="select-icon" style={{ color: c.color }} />,
+                  }))}
+                />
+              </div>
             )}
           </section>
 

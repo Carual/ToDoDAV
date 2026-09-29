@@ -18,8 +18,9 @@ import {
 } from '../viewSettings.ts';
 import { FilterModal } from './FilterModal.tsx';
 import { ImportExportModal } from './ImportExportModal.tsx';
-import { ChevronDownIcon, FilterIcon, GearIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
+import { ChevronDownIcon, FilterIcon, GearIcon, HashIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
+import { Select } from './Select.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
 import { ShareModal } from './ShareModal.tsx';
 import { Spinner } from './Spinner.tsx';
@@ -352,20 +353,17 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                   </button>
                 )}
                 {calendars.length > 1 && (
-                  <label className="calendar-select">
-                    <span className="visually-hidden">Task list</span>
-                    <select
-                      value={calendar.href}
-                      onChange={(e) => selectCalendar(e.target.value)}
-                    >
-                      {calendars.map((c) => (
-                        <option key={c.href} value={c.href}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDownIcon />
-                  </label>
+                  <Select
+                    className="calendar-select"
+                    aria-label="Task list"
+                    value={calendar.href}
+                    onChange={selectCalendar}
+                    options={calendars.map((c) => ({
+                      value: c.href,
+                      label: c.name,
+                      icon: <HashIcon className="select-icon" style={{ color: c.color }} />,
+                    }))}
+                  />
                 )}
               </div>
             </div>

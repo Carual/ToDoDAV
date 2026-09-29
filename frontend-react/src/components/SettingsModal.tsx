@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { DEFAULT_SETTINGS, ROW_FIELD_NAMES, type ListLayout, type ViewSettings } from '../viewSettings.ts';
 import { ChevronDownIcon, ChevronUpIcon, CloseIcon, GearIcon, TransferIcon } from './icons.tsx';
+import { Select } from './Select.tsx';
 
 interface Props {
   settings: ViewSettings;
@@ -62,17 +63,19 @@ export function SettingsModal({ settings, onChange, onImportExport, onClose }: P
                 Show sub-tasks under their parent
               </label>
             </div>
-            <label className="settings-row">
+            <div className="settings-row">
               <span className="settings-label">Tasks without a due date</span>
-              <select
+              <Select
                 className="settings-select"
+                aria-label="Tasks without a due date"
                 value={layout.undatedFirst ? 'first' : 'last'}
-                onChange={(e) => setLayout({ undatedFirst: e.target.value === 'first' })}
-              >
-                <option value="last">At the end</option>
-                <option value="first">At the top</option>
-              </select>
-            </label>
+                onChange={(order) => setLayout({ undatedFirst: order === 'first' })}
+                options={[
+                  { value: 'last', label: 'At the end' },
+                  { value: 'first', label: 'At the top' },
+                ]}
+              />
+            </div>
           </section>
 
           <section className="settings-section">
