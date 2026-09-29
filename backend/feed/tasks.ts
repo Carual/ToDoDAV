@@ -1,8 +1,8 @@
-import express, { type Router } from 'express';
+import type { Request, Response as ExpressResponse } from 'express';
 import ICAL from 'ical.js';
 import { basicAuth } from '../auth.ts';
 import type { Config } from '../config.ts';
-import { markdownToText, plainText } from '../../shared/markdown.ts';
+import { markdownToHtml, markdownToText, plainText } from '../../shared/markdown.ts';
 
 const DAV = 'DAV:';
 const CALDAV = 'urn:ietf:params:xml:ns:caldav';
@@ -13,12 +13,27 @@ const PROPFIND_BODY =
   '<?xml version="1.0" encoding="utf-8"?>' +
   `<d:propfind xmlns:d="${DAV}"><d:prop><d:resourcetype/><d:displayname/></d:prop></d:propfind>`;
 
+// Every object: nested comp-filters would all have to match (RFC 4791 9.7.1), and both VTODOs and VEVENTs are wanted.
 const REPORT_BODY =
   '<?xml version="1.0" encoding="utf-8"?>' +
   `<c:calendar-query xmlns:d="${DAV}" xmlns:c="${CALDAV}">` +
   '<d:prop><c:calendar-data/></d:prop>' +
-  '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter>' +
+  '<c:filter><c:comp-filter name="VCALENDAR"/></c:filter>' +
   '</c:calendar-query>';
+
+/** How tasks become events, from the feed's query string (feed/index.ts). */
+export interface TaskOptions {
+  /** completed=0 leaves completed tasks out. */
+  completed: boolean;
+  /** subtasks=0 leaves out tasks whose parent is in the same list. */
+  subtasks: boolean;
+  /** priority=1,2: only these Todoist-style priorities (1 highest, 4 none). */
+  priorities: number[];
+  /** format=html: the description as the HTML Google Calendar renders, instead of plain text. */
+  html: boolean;
+  /** duration=30: timed tasks last this many minutes instead of being an instant. */
+  duration: number;
+}
 
 /**
  * VTODO properties that mean the same in a VEVENT. SUMMARY and DESCRIPTION are rewritten (their Markdown as
@@ -28,24 +43,18 @@ const COPIED = ['uid', 'dtstamp', 'sequence', 'created', 'last-modified', 'locat
 const REPEAT = new Set(['rrule', 'rdate', 'exdate']);
 
 /**
- * /feed/tasks/<path>: one task list as a calendar of events, because Google Calendar ignores VTODOs.
- * The path must be a single calendar; anything else answers 404.
+ * The feed with tasks=1: one calendar with its tasks turned into events, because Google Calendar ignores
+ * VTODOs. Its own events stay as stored. The path must be a single calendar; anything else answers 404.
  */
-export function tasksFeed(config: Config): Router {
+export function tasksAsEvents(config: Config): (req: Request, res: ExpressResponse, options: TaskOptions) => Promise<void> {
   const authorization = basicAuth(config.username, config.password);
-  const router = express.Router();
 
-  router.use(async (req, res) => {
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      res.status(405).json({ error: 'method_not_allowed' });
-      return;
-    }
-
+  return async (req, res, options) => {
     let calendar: TaskList | undefined;
     try {
       calendar = await readTaskList(new URL(req.path.slice(1), config.caldavUrl), authorization);
     } catch (error) {
-      console.error('Tasks feed: could not read the CalDAV server:', error);
+      console.error('Feed: could not read the CalDAV server:', error);
       res.status(502).json({ error: 'caldav_unavailable' });
       return;
     }
@@ -58,10 +67,8 @@ export function tasksFeed(config: Config): Router {
       .attachment(calendarFileName(calendar.name, req.path))
       .type('text/calendar; charset=utf-8')
       .set('Cache-Control', 'no-cache')
-      .send(toEventCalendar(calendar));
-  });
-
-  return router;
+      .send(toEventCalendar(calendar, options));
+  };
 }
 
 /**
@@ -82,7 +89,7 @@ export function calendarFileName(name: string | undefined, path: string): string
 
 interface TaskList {
   name?: string;
-  /** iCalendar text of every calendar object holding a VTODO. */
+  /** iCalendar text of every calendar object (tasks, events, anything else the calendar holds). */
   objects: string[];
 }
 
@@ -133,7 +140,7 @@ function unescapeXml(text: string): string {
   });
 }
 
-function toEventCalendar(list: TaskList): string {
+function toEventCalendar(list: TaskList, options: TaskOptions): string {
   const out = new ICAL.Component('vcalendar');
   out.addPropertyWithValue('version', '2.0');
   out.addPropertyWithValue('prodid', '-//ToDoDAV//Tasks feed//EN');
@@ -141,15 +148,19 @@ function toEventCalendar(list: TaskList): string {
   // A refresh hint. Google ignores it and refreshes on its own schedule; Apple Calendar honors it.
   out.addPropertyWithValue('x-published-ttl', 'PT1H');
 
+  const vcalendars: ICAL.Component[] = [];
+  for (const ics of list.objects) {
+    try {
+      vcalendars.push(new ICAL.Component(ICAL.parse(ics)));
+    } catch {
+      // One broken object must not take the whole feed down.
+    }
+  }
+  const isSubtask = subtaskTest(vcalendars);
+
   const timezones = new Map<string, ICAL.Component>();
   const events: ICAL.Component[] = [];
-  for (const ics of list.objects) {
-    let vcalendar: ICAL.Component;
-    try {
-      vcalendar = new ICAL.Component(ICAL.parse(ics));
-    } catch {
-      continue; // One broken object must not take the whole feed down.
-    }
+  for (const vcalendar of vcalendars) {
     for (const vtimezone of vcalendar.getAllSubcomponents('vtimezone')) {
       const tzid = String(vtimezone.getFirstPropertyValue('tzid') ?? '');
       if (!tzid || timezones.has(tzid)) continue;
@@ -162,11 +173,16 @@ function toEventCalendar(list: TaskList): string {
       }
     }
 
-    // Overrides (RECURRENCE-ID) of a repeating task only make sense next to its master event.
+    // The calendar's own events are passed on untouched.
+    events.push(...vcalendar.getAllSubcomponents('vevent'));
+
     const vtodos = vcalendar.getAllSubcomponents('vtodo');
-    const master = vtodos.find((vtodo) => !vtodo.hasProperty('recurrence-id'));
-    const converted = vtodos.map(toEvent);
-    if (master && !converted[vtodos.indexOf(master)]) continue;
+    const master = vtodos.find((vtodo) => !vtodo.hasProperty('recurrence-id')) ?? vtodos[0];
+    // The filters look at the whole task (its master), so a repeating task is in or out as a whole.
+    if (!master || !wanted(master, options, isSubtask)) continue;
+    // Overrides (RECURRENCE-ID) of a repeating task only make sense next to its master event.
+    const converted = vtodos.map((vtodo) => toEvent(vtodo, options));
+    if (!master.hasProperty('recurrence-id') && !converted[vtodos.indexOf(master)]) continue;
     for (const event of converted) if (event) events.push(event);
   }
 
@@ -175,29 +191,75 @@ function toEventCalendar(list: TaskList): string {
   return out.toString();
 }
 
+/** The priority filter and subtasks=0, on a task's master VTODO. completed=0 is per occurrence, in toEvent. */
+function wanted(vtodo: ICAL.Component, options: TaskOptions, isSubtask: (uid: string) => boolean): boolean {
+  if (!options.priorities.includes(priorityOf(vtodo))) return false;
+  return options.subtasks || !isSubtask(String(vtodo.getFirstPropertyValue('uid') ?? ''));
+}
+
+// iCalendar PRIORITY is 1 (highest) to 9 (lowest), 0 = undefined; the app's mapping (Tasks.org / DAVx5).
+function priorityOf(vtodo: ICAL.Component): number {
+  const value = Number(vtodo.getFirstPropertyValue('priority') ?? 0);
+  if (value >= 1 && value <= 4) return 1;
+  if (value === 5) return 2;
+  if (value >= 6 && value <= 9) return 3;
+  return 4;
+}
+
+/**
+ * Whether a task is a sub-task as the app shows it: its parent (RELATED-TO with RELTYPE=PARENT or none) is in
+ * this list, and it is not part of a loop written by another client (those show at the top level).
+ */
+function subtaskTest(vcalendars: ICAL.Component[]): (uid: string) => boolean {
+  const parents = new Map<string, string | undefined>();
+  for (const vcalendar of vcalendars) {
+    const vtodo = vcalendar.getAllSubcomponents('vtodo').find((todo) => !todo.hasProperty('recurrence-id'));
+    const uid = vtodo?.getFirstPropertyValue('uid');
+    if (!vtodo || !uid) continue;
+    const parent = vtodo.getAllProperties('related-to').find((property) => {
+      const reltype = property.getParameter('reltype');
+      return !reltype || String(reltype).toUpperCase() === 'PARENT';
+    });
+    const parentUid = parent?.getFirstValue();
+    parents.set(String(uid), parentUid ? String(parentUid) : undefined);
+  }
+
+  return (uid) => {
+    let current = parents.get(uid);
+    if (current === undefined || !parents.has(current)) return false;
+    const seen = new Set<string>();
+    while (current !== undefined && parents.has(current) && !seen.has(current)) {
+      if (current === uid) return false;
+      seen.add(current);
+      current = parents.get(current);
+    }
+    return true;
+  };
+}
+
 /**
  * One VTODO as a VEVENT, or `undefined` when it does not belong in the feed.
  * - No due date: left out, a calendar has nowhere to put it.
- * - Cancelled: left out. For an override of a repeating task it stays as a cancelled occurrence instead,
- *   because leaving it out would bring back the master's occurrence on that date.
+ * - Cancelled (or completed, with completed=0): left out. For an override of a repeating task it stays as a
+ *   cancelled occurrence instead, because leaving it out would bring back the master's occurrence on that date.
  * - Completed: kept, with "✓ " before the title, and without its repeat.
- * - Title and description: their Markdown as plain text, links as "text (address)".
+ * - Title: its Markdown as plain text, links as "text (address)". Description: the same, or HTML with format=html.
  * - Start before due (same value type): spans start to due. Otherwise it sits on the due date alone.
- * - Timed: an instant (DTEND = DTSTART). All-day: DTEND is the next day, since DTEND is exclusive.
+ * - Timed: an instant (DTEND = DTSTART), or `duration` minutes long. All-day: DTEND is the next day (exclusive).
  * - Reminders (VALARM) are kept; the event is "free" so it never blocks time.
  */
-function toEvent(vtodo: ICAL.Component): ICAL.Component | undefined {
+function toEvent(vtodo: ICAL.Component, options: TaskOptions): ICAL.Component | undefined {
   const due = dueOf(vtodo);
   if (!due) return undefined;
 
   const event = new ICAL.Component('vevent');
   const status = String(vtodo.getFirstPropertyValue('status') ?? '').toUpperCase();
-  if (status === 'CANCELLED') {
+  const completed = status === 'COMPLETED' || vtodo.hasProperty('completed');
+  if (status === 'CANCELLED' || (completed && !options.completed)) {
     if (!vtodo.hasProperty('recurrence-id')) return undefined;
     event.addPropertyWithValue('status', 'CANCELLED');
   }
 
-  const completed = status === 'COMPLETED' || vtodo.hasProperty('completed');
   for (const name of COPIED) {
     // A repeating task completed for good (ToDoDAV keeps its rule so reopening brings the repeat back) is
     // done once, not ticked off on every future date.
@@ -208,10 +270,13 @@ function toEvent(vtodo: ICAL.Component): ICAL.Component | undefined {
 
   // Calendars show Markdown as typed, asterisks and all. Links keep their address, which Google Calendar
   // turns back into a link in the description and which can at least be copied from the title.
+  // HTML in DESCRIPTION is not iCalendar, but Google Calendar renders it; other apps show the tags.
   const summary = plainText(String(vtodo.getFirstPropertyValue('summary') ?? ''), true);
   event.addPropertyWithValue('summary', completed ? `✓ ${summary}` : summary);
   const description = String(vtodo.getFirstPropertyValue('description') ?? '');
-  if (description.trim()) event.addPropertyWithValue('description', markdownToText(description));
+  if (description.trim()) {
+    event.addPropertyWithValue('description', options.html ? markdownToHtml(description) : markdownToText(description));
+  }
 
   const startProperty = vtodo.getFirstProperty('dtstart');
   const start = startProperty?.getFirstValue();
@@ -220,6 +285,8 @@ function toEvent(vtodo: ICAL.Component): ICAL.Component | undefined {
 
   const end = due.time.clone();
   if (end.isDate) end.adjust(1, 0, 0, 0);
+  // Google draws an instant as a sliver; a span already has its own length.
+  else if (!span && options.duration > 0) end.addDuration(ICAL.Duration.fromSeconds(options.duration * 60));
   event.addProperty(copyAs(due.property, 'dtend', end));
 
   event.addPropertyWithValue('transp', 'TRANSPARENT');

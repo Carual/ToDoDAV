@@ -1,45 +1,79 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Calendar, CalDavClient, ServerConfig } from '../api/caldav.ts';
-import { CloseIcon, HashIcon } from './icons.tsx';
+import type { Calendar, CalDavClient } from '../api/caldav.ts';
+import type { Priority } from '../api/tasks.ts';
+import { ALL_PRIORITIES, readSetting, saveSetting } from '../viewSettings.ts';
+import { CloseIcon, FlagIcon, HashIcon } from './icons.tsx';
+import { Select } from './Select.tsx';
 
 interface Props {
   client: CalDavClient;
   calendar: Calendar;
-  feeds: ServerConfig['feeds'];
+  token: string;
   onClose: () => void;
 }
 
-interface FeedLink {
-  title: string;
-  description: string;
-  url: string;
+/** What the feed's query string asks for (backend/feed/index.ts); the defaults add nothing to the URL. */
+interface FeedOptions {
+  /** tasks=1: tasks become events. Off, the calendar is sent as stored (and Google ignores its tasks). */
+  tasks: boolean;
+  completed: boolean;
+  subtasks: boolean;
+  priorities: Priority[];
+  html: boolean;
+  /** Minutes a timed task lasts; 0 is an instant. */
+  duration: number;
 }
 
-/** The subscription URLs of one list, for Google Calendar's "Other calendars → From URL". */
-function feedLinks(client: CalDavClient, calendar: Calendar, feeds: ServerConfig['feeds']): FeedLink[] {
-  if (!feeds.token) return [];
-  const path = client.relativePath(calendar.href);
-  const url = (feed: string) => `${window.location.origin}/feed/${feed}/${feeds.token}/${path}`;
-  const links: FeedLink[] = [];
-  if (feeds.tasks) {
-    links.push({
-      title: 'Tasks as events',
-      description: 'Each task with a due date shows up as an event on that date.',
-      url: url('tasks'),
-    });
+const OPTIONS_KEY = 'tododav.feedOptions';
+
+// Tasks as events by default: the modal shares task lists, and Google Calendar shows nothing of them otherwise.
+const DEFAULT_OPTIONS: FeedOptions = { tasks: true, completed: true, subtasks: true, priorities: ALL_PRIORITIES, html: false, duration: 0 };
+
+const DURATIONS = [
+  { value: '0', label: 'No duration' },
+  { value: '15', label: '15 minutes' },
+  { value: '30', label: '30 minutes' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+];
+
+/** The options last used, so the next list's link comes out the same; anything unreadable falls back to the default. */
+function loadOptions(): FeedOptions {
+  let saved: Partial<Record<keyof FeedOptions, unknown>> = {};
+  try {
+    saved = JSON.parse(readSetting(OPTIONS_KEY) ?? '{}') ?? {};
+  } catch {
+    // Keep the defaults.
   }
-  if (feeds.events) {
-    links.push({
-      title: 'Events',
-      description: 'The events stored in this calendar, as they are.',
-      url: url('events'),
-    });
-  }
-  return links;
+  const bool = (value: unknown, fallback: boolean) => (typeof value === 'boolean' ? value : fallback);
+  const priorities = Array.isArray(saved.priorities) ? ALL_PRIORITIES.filter((p) => (saved.priorities as unknown[]).includes(p)) : [];
+  return {
+    tasks: bool(saved.tasks, DEFAULT_OPTIONS.tasks),
+    completed: bool(saved.completed, DEFAULT_OPTIONS.completed),
+    subtasks: bool(saved.subtasks, DEFAULT_OPTIONS.subtasks),
+    priorities: priorities.length > 0 ? priorities : DEFAULT_OPTIONS.priorities,
+    html: bool(saved.html, DEFAULT_OPTIONS.html),
+    duration: DURATIONS.some((d) => Number(d.value) === saved.duration) ? (saved.duration as number) : DEFAULT_OPTIONS.duration,
+  };
 }
 
-export function ShareModal({ client, calendar, feeds, onClose }: Props) {
-  const links = feedLinks(client, calendar, feeds);
+/** The list's subscription URL, for Google Calendar's "Other calendars → From URL". */
+function feedUrl(client: CalDavClient, calendar: Calendar, token: string, options: FeedOptions): string {
+  const url = `${window.location.origin}/feed/${token}/${client.relativePath(calendar.href)}`;
+  if (!options.tasks) return url;
+  // Built by hand so the priority list keeps its plain commas instead of %2C.
+  const params = ['tasks=1'];
+  if (!options.completed) params.push('completed=0');
+  if (!options.subtasks) params.push('subtasks=0');
+  if (options.priorities.length < ALL_PRIORITIES.length) params.push(`priority=${options.priorities.join(',')}`);
+  if (options.html) params.push('format=html');
+  if (options.duration > 0) params.push(`duration=${options.duration}`);
+  return `${url}?${params.join('&')}`;
+}
+
+export function ShareModal({ client, calendar, token, onClose }: Props) {
+  const [options, setOptions] = useState(loadOptions);
+  const url = feedUrl(client, calendar, token, options);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -48,6 +82,19 @@ export function ShareModal({ client, calendar, feeds, onClose }: Props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  function update(patch: Partial<FeedOptions>) {
+    const next = { ...options, ...patch };
+    setOptions(next);
+    saveSetting(OPTIONS_KEY, JSON.stringify(next));
+  }
+
+  function togglePriority(priority: Priority) {
+    const priorities = options.priorities.includes(priority)
+      ? options.priorities.filter((p) => p !== priority)
+      : ALL_PRIORITIES.filter((p) => p === priority || options.priorities.includes(p));
+    update({ priorities });
+  }
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -65,16 +112,90 @@ export function ShareModal({ client, calendar, feeds, onClose }: Props) {
         <div className="share-body">
           <h2>Add to Google Calendar</h2>
           <p className="muted">
-            In Google Calendar, open <strong>Other calendars → + → From URL</strong> and paste a link.
+            In Google Calendar, open <strong>Other calendars → + → From URL</strong> and paste the link.
           </p>
 
-          {links.map((link) => (
-            <FeedLinkField key={link.url} link={link} />
-          ))}
+          <div className="share-options">
+            <div className="settings-row">
+              <label className="switch settings-switch">
+                <input type="checkbox" checked={options.tasks} onChange={(e) => update({ tasks: e.target.checked })} />
+                <span className="switch-track" aria-hidden="true" />
+                Show tasks as events
+              </label>
+            </div>
+            <p className="muted">
+              {options.tasks
+                ? 'Each task with a due date becomes an event on that date. Events in the list stay as they are.'
+                : 'The calendar exactly as stored. Google Calendar ignores tasks, so only its events show up.'}
+            </p>
+
+            {options.tasks && (
+              <div className="share-task-options">
+                <div className="settings-row">
+                  <label className="switch settings-switch">
+                    <input type="checkbox" checked={options.completed} onChange={(e) => update({ completed: e.target.checked })} />
+                    <span className="switch-track" aria-hidden="true" />
+                    Completed tasks
+                  </label>
+                </div>
+                <div className="settings-row">
+                  <label className="switch settings-switch">
+                    <input type="checkbox" checked={options.subtasks} onChange={(e) => update({ subtasks: e.target.checked })} />
+                    <span className="switch-track" aria-hidden="true" />
+                    Sub-tasks
+                  </label>
+                </div>
+                <div className="settings-row">
+                  <span className="settings-label" id="share-priority">
+                    Priority
+                  </span>
+                  <div className="priority-toggles" role="group" aria-labelledby="share-priority">
+                    {ALL_PRIORITIES.map((p) => {
+                      const on = options.priorities.includes(p);
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className={`priority-toggle p${p}`}
+                          aria-pressed={on}
+                          // At least one priority stays on: a feed of nothing would only look broken.
+                          disabled={on && options.priorities.length === 1}
+                          title={`Priority ${p}`}
+                          onClick={() => togglePriority(p)}
+                        >
+                          <FlagIcon />P{p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="settings-row">
+                  <label className="switch settings-switch">
+                    <input type="checkbox" checked={options.html} onChange={(e) => update({ html: e.target.checked })} />
+                    <span className="switch-track" aria-hidden="true" />
+                    Formatted descriptions
+                  </label>
+                </div>
+                <p className="muted">Bold, italic, links and lists. Google Calendar only: other apps show the HTML tags.</p>
+                <div className="settings-row">
+                  <span className="settings-label">Timed tasks last</span>
+                  <Select
+                    className="settings-select"
+                    aria-label="Timed tasks last"
+                    value={String(options.duration)}
+                    onChange={(duration) => update({ duration: Number(duration) })}
+                    options={DURATIONS}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <FeedLinkField url={url} />
 
           <p className="share-note">
-            Anyone with a link can see this list, so keep it private. The calendar is read-only, and Google only
-            refreshes it every few hours.
+            Anyone with the link can see this list, so keep it private. The calendar is read-only, and Google only
+            refreshes it every few hours. Changing the options makes a new link: subscribe to it again.
           </p>
         </div>
       </div>
@@ -82,16 +203,19 @@ export function ShareModal({ client, calendar, feeds, onClose }: Props) {
   );
 }
 
-function FeedLinkField({ link }: { link: FeedLink }) {
+function FeedLinkField({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
+  // A copied link that has since changed must not still say "Copied".
+  useEffect(() => setCopied(false), [url]);
+
   async function copy() {
     try {
-      await navigator.clipboard.writeText(link.url);
+      await navigator.clipboard.writeText(url);
     } catch {
       // The Clipboard API only exists on HTTPS/localhost: select the text so Ctrl+C works instead.
       inputRef.current?.select();
@@ -104,16 +228,9 @@ function FeedLinkField({ link }: { link: FeedLink }) {
 
   return (
     <div className="share-link">
-      <h3>{link.title}</h3>
-      <p className="muted">{link.description}</p>
+      <h3>Link</h3>
       <div className="share-link-row">
-        <input
-          ref={inputRef}
-          value={link.url}
-          readOnly
-          aria-label={`${link.title} link`}
-          onFocus={(event) => event.target.select()}
-        />
+        <input ref={inputRef} value={url} readOnly aria-label="Feed link" onFocus={(event) => event.target.select()} />
         <button type="button" className="btn btn-primary" onClick={() => void copy()}>
           {copied ? 'Copied' : 'Copy'}
         </button>

@@ -5,8 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { requireCredentials, requireFeedAccess } from './auth.ts';
 import { loadConfig } from './config.ts';
-import { eventsFeed } from './feed/events.ts';
-import { tasksFeed } from './feed/tasks.ts';
+import { feed } from './feed/index.ts';
 
 const config = loadConfig();
 const app = express();
@@ -37,8 +36,8 @@ const requireLogin = requireCredentials(config.username, config.password);
 // What the frontend needs to know about this install. Behind the same checks as /proxy because it
 // reveals the feed token; no-store so it is not kept in any cache.
 app.get('/api/config', requireHttps, requireLogin, (_req, res) => {
-  const { tasks, events, token } = config.feeds;
-  res.set('Cache-Control', 'no-store').json({ feeds: { tasks, events, token: tasks || events ? token : undefined } });
+  const { enabled, token } = config.feed;
+  res.set('Cache-Control', 'no-store').json({ feed: enabled ? { token } : undefined });
 });
 
 // Everything under /proxy goes to the CalDAV server from env: /proxy/juan/tasks/ -> CALDAV_URL + juan/tasks/.
@@ -71,12 +70,10 @@ app.use(
   }),
 );
 
-// Read-only .ics feeds for calendar apps that cannot log in to CalDAV (Google Calendar's "From URL").
-// They read the CalDAV server with the credentials from env, so the token in their URL is what guards them.
+// Read-only .ics feed for calendar apps that cannot log in to CalDAV (Google Calendar's "From URL").
+// It reads the CalDAV server with the credentials from env, so the token in its URL is what guards it.
 // Off unless enabled, so no install publishes anything by accident.
-const feedAccess = requireFeedAccess(config.feeds.token);
-if (config.feeds.tasks) app.use('/feed/tasks', requireHttps, feedAccess, tasksFeed(config));
-if (config.feeds.events) app.use('/feed/events', requireHttps, feedAccess, eventsFeed(config));
+if (config.feed.enabled) app.use('/feed', requireHttps, requireFeedAccess(config.feed.token), feed(config));
 
 // The built app (npm run build); any other path gets index.html for the client-side routes (/login, /tasks/<uid>).
 // HTTPS-only in production like /proxy, so the login page never sends the password in the clear.
@@ -92,6 +89,5 @@ const server = app.listen(config.port, config.host, (error) => {
   } else {
     console.warn('Development mode: plain HTTP is accepted. Set NODE_ENV=production when deploying.');
   }
-  const feeds = [config.feeds.tasks && '/feed/tasks', config.feeds.events && '/feed/events'].filter(Boolean);
-  if (feeds.length > 0) console.log(`Feeds enabled: ${feeds.join(', ')}`);
+  if (config.feed.enabled) console.log('Feed enabled: /feed');
 });

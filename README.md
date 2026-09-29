@@ -25,7 +25,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - Edit title, description, start date, due date (all-day or with a time), priority and labels. Ctrl/⌘+Enter saves.
 - Markdown in titles and descriptions, as in Todoist: **bold**, *italic*, ~~strikethrough~~, `code` and links in both, plus headings, lists, quotes and code blocks in descriptions.
 - Import and export a list (Settings → Import or export), either as an iCalendar `.ics` file or as a Todoist CSV that Todoist can import (and read Todoist's CSV exports and template). Everything happens in your browser.
-- Optional read-only calendar feeds for Google Calendar, with a share button that gives you the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
+- An optional read-only calendar feed for Google Calendar, with a share button that builds the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
 
 ## How it works
 
@@ -73,7 +73,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
    | `CALDAV_PASSWORD` | Your CalDAV password (ideally an app-specific one). |
    | `HOST` | Default `0.0.0.0`. Use `127.0.0.1` if the reverse proxy runs on the same machine. |
    | `PORT` | Default `3852`. |
-   | `FEED_TASKS_ENABLED`, `FEED_EVENTS_ENABLED`, `FEED_TOKEN` | Optional calendar feeds, see [below](#calendar-feeds-google-calendar). |
+   | `FEED_ENABLED`, `FEED_TOKEN` | Optional calendar feed, see [below](#calendar-feeds-google-calendar). |
 
 3. **Start it**: `npm start` (Bun) or `npm run start:node` (Node). One process serves the app and the backend. Keep it running with systemd, Docker, pm2 or whatever you prefer. `GET /api/status` answers `{"status":"ok"}` so you can health-check it.
 
@@ -112,19 +112,28 @@ Docker's `--env-file` takes values literally, so don't wrap them in quotes. To u
 
 ## Calendar feeds (Google Calendar)
 
-Google Calendar can't log in to CalDAV and ignores tasks, so ToDoDAV can publish read-only `.ics` feeds for it. Both are off by default:
+Google Calendar can't log in to CalDAV and ignores tasks, so ToDoDAV can publish a read-only `.ics` feed for it. It is off by default; turn it on with `FEED_ENABLED=true`.
 
-| Feed | Enable with | URL | What you get |
-| --- | --- | --- | --- |
-| Tasks | `FEED_TASKS_ENABLED=true` | `https://tasks.example.com/feed/tasks/<token>/juan/tasks/` | One task list, with each task shown as an event on its due date |
-| Events | `FEED_EVENTS_ENABLED=true` | `https://tasks.example.com/feed/events/<token>/juan/calendar/` | One calendar, unchanged (needs Radicale) |
+The feed URL is `https://tasks.example.com/feed/<token>/juan/tasks/`. As is, it sends that calendar unchanged (this needs Radicale). Query parameters change it:
 
-Enabling a feed requires `FEED_TOKEN`: a long random string (`openssl rand -hex 32`) that goes in the URL as `<token>`. **Anyone with the URL can read that calendar**, so keep it secret, and change the token to revoke old URLs. You don't have to build the URLs yourself: when a feed is on, the share button next to the list name shows the links for that list, ready to copy. In Google Calendar, add a link under *Other calendars → From URL*. Use one URL per list.
+| Parameter | What it does |
+| --- | --- |
+| `tasks=1` | Shows each task with a due date as an event on that date. The calendar's own events stay as they are. The options below only work with this one. |
+| `completed=0` | Leaves completed tasks out. |
+| `subtasks=0` | Leaves sub-tasks out. |
+| `priority=1,2` | Only tasks with these priorities (1 is the highest, 4 is none). |
+| `format=html` | Formatted descriptions: bold, italic, links and lists. Only Google Calendar shows them; other calendar apps show the HTML tags. |
+| `duration=30` | Timed tasks last this many minutes instead of being a point in time. |
+
+For example: `https://tasks.example.com/feed/<token>/juan/tasks/?tasks=1&completed=0&format=html`.
+
+Enabling the feed requires `FEED_TOKEN`: a long random string (`openssl rand -hex 32`) that goes in the URL as `<token>`. **Anyone with the URL can read that calendar**, so keep it secret, and change the token to revoke old URLs. You don't have to build the URLs yourself: when the feed is on, the share button next to the list name shows the link for that list, with switches for the options, ready to copy. In Google Calendar, add it under *Other calendars → From URL*. Use one URL per list.
 
 What to expect:
 
 - **Read-only and slow to update.** Google refreshes subscribed calendars on its own schedule, often every 8–24 hours. Completing a task in Google isn't possible.
-- **Tasks feed:** tasks without a due date and cancelled tasks are left out. Completed tasks stay with a ✓ (on their last date only, if they repeated). A task with a start date before its due date spans both. Timed tasks are a point in time, and repeating tasks repeat. Priority and labels aren't shown.
+- **Changing the options makes a new URL**, which Google treats as a different calendar: subscribe to the new one and remove the old one.
+- **Tasks as events:** tasks without a due date and cancelled tasks are left out. Completed tasks stay with a ✓ (on their last date only, if they repeated). A task with a start date before its due date spans both. Repeating tasks repeat. Priority and labels aren't shown.
 
 ## Security
 

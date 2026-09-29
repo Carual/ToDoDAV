@@ -1920,6 +1920,25 @@ button {
   font-size: 13px;
 }
 
+.share-options {
+  margin-top: 12px;
+  padding: 4px 0 8px;
+  border-top: 1px solid var(--divider);
+  border-bottom: 1px solid var(--divider);
+}
+
+.share-body .share-options p {
+  margin: -2px 0 4px;
+  font-size: 12px;
+}
+
+/* The task options belong to "Show tasks as events", so they sit under it. */
+.share-task-options {
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--divider);
+}
+
 .share-link {
   margin-top: 16px;
 }

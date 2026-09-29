@@ -13,15 +13,11 @@ export interface Calendar {
 
 /** Settings of this ToDoDAV install, from the backend's /api/config. */
 export interface ServerConfig {
-  feeds: {
-    tasks: boolean;
-    events: boolean;
-    /** Present when at least one feed is enabled. */
-    token?: string;
-  };
+  /** Present when the calendar feed (/feed/<token>/...) is enabled. */
+  feed?: { token: string };
 }
 
-export const NO_FEEDS: ServerConfig = { feeds: { tasks: false, events: false } };
+export const NO_FEEDS: ServerConfig = {};
 
 export class CalDavError extends Error {
   /** 0 means the server could not be reached. */

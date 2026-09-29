@@ -1,7 +1,8 @@
 /*
  * The Markdown Todoist reads in task names (inline only) and descriptions (blocks too). Hand-written rather
  * than a dependency. Shared by the app, which renders it as React elements (never as HTML, so whatever another
- * app wrote in a task can't inject markup), and the tasks feed, which turns it into plain text for calendars.
+ * app wrote in a task can't inject markup), and the feed, which turns it into plain text (or, for Google Calendar,
+ * a few escaped HTML tags) for calendars.
  * Plain TypeScript only: the backend runs it with type stripping.
  */
 
@@ -259,6 +260,63 @@ function blocksText(blocks: Block[]): string[] {
           .join('\n');
       case 'rule':
         return '──────────';
+    }
+  });
+}
+
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]!);
+
+const lines = (html: string) => html.replace(/\n/g, '<br>');
+
+function inlineHtml(nodes: Inline[]): string {
+  return nodes
+    .map((node) => {
+      switch (node.type) {
+        case 'text':
+        case 'code':
+          return escapeHtml(node.text);
+        case 'strong':
+          return `<b>${inlineHtml(node.children)}</b>`;
+        case 'em':
+          return `<i>${inlineHtml(node.children)}</i>`;
+        case 'del':
+          return `<s>${inlineHtml(node.children)}</s>`;
+        case 'link':
+          return isSafeHref(node.href)
+            ? `<a href="${escapeHtml(node.href)}">${inlineHtml(node.children)}</a>`
+            : inlineHtml(node.children);
+      }
+    })
+    .join('');
+}
+
+/**
+ * A description as the little HTML Google Calendar renders in an event's description (what its own editor
+ * writes: bold, italic, links, lists, line breaks). Anything else falls back to how markdownToText writes it.
+ * Everything from the task is escaped, so it can only add these tags.
+ */
+export function markdownToHtml(markdown: string): string {
+  return blocksHtml(parseMarkdown(markdown)).join('<br><br>');
+}
+
+function blocksHtml(blocks: Block[]): string[] {
+  return blocks.map((block) => {
+    switch (block.type) {
+      case 'paragraph':
+        return lines(inlineHtml(parseInline(block.text)));
+      case 'heading':
+        return `<b>${inlineHtml(parseInline(block.text))}</b>`;
+      case 'list': {
+        const tag = block.ordered ? 'ol' : 'ul';
+        const start = block.ordered && block.start !== 1 ? ` start="${block.start}"` : '';
+        const items = block.items.map((item) => `<li>${blocksHtml(item).join('<br>')}</li>`).join('');
+        return `<${tag}${start}>${items}</${tag}>`;
+      }
+      case 'code':
+      case 'quote':
+      case 'rule':
+        return lines(escapeHtml(blocksText([block])[0]!));
     }
   });
 }

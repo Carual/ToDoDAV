@@ -128,7 +128,7 @@ interface Props {
 
 export function MainPage({ session, openUid, onLogout }: Props) {
   const { client, calendars, config } = session;
-  const canShare = config.feeds.tasks || config.feeds.events;
+  const canShare = config.feed !== undefined;
   // "All" only makes sense with several lists, and is where the app starts then, like Todoist's all-projects views.
   const canShowAll = calendars.length > 1;
   const [selected, setSelected] = useState(() => {
@@ -516,8 +516,8 @@ export function MainPage({ session, openUid, onLogout }: Props) {
         />
       )}
 
-      {calendar && sharing && (
-        <ShareModal client={client} calendar={calendar} feeds={config.feeds} onClose={() => setSharing(false)} />
+      {calendar && sharing && config.feed && (
+        <ShareModal client={client} calendar={calendar} token={config.feed.token} onClose={() => setSharing(false)} />
       )}
 
       {editingSettings && (
