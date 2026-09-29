@@ -387,6 +387,16 @@ export function MainPage({ session, openUid, onLogout }: Props) {
                     ]}
                   />
                 )}
+                {/* The same as "+ Add task" under the list, reachable without scrolling past a long one. */}
+                <button
+                  type="button"
+                  className="icon-btn header-add"
+                  aria-label="Add task"
+                  title="Add task (Q)"
+                  onClick={() => setCreating(true)}
+                >
+                  <PlusIcon />
+                </button>
               </div>
             </div>
 
