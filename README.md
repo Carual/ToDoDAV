@@ -23,6 +23,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - Add tasks with the "+ Add task" row or the **Q** key.
 - Sub-tasks: add them from a task's page, see them nested under their parent (collapsible), and completing a parent completes its sub-tasks. They use the standard `RELATED-TO` property, so sub-tasks made in Tasks.org, Thunderbird and similar apps show up too.
 - Edit title, description, start date, due date (all-day or with a time), priority and labels. Ctrl/⌘+Enter saves.
+- Import and export a list (Settings → Import or export), either as an iCalendar `.ics` file or as a Todoist CSV that Todoist can import (and read Todoist's CSV exports and template). Everything happens in your browser.
 - Optional read-only calendar feeds for Google Calendar, with a share button that gives you the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
 
 ## How it works
@@ -122,7 +123,7 @@ Enabling a feed requires `FEED_TOKEN`: a long random string (`openssl rand -hex 
 What to expect:
 
 - **Read-only and slow to update.** Google refreshes subscribed calendars on its own schedule, often every 8–24 hours. Completing a task in Google isn't possible.
-- **Tasks feed:** tasks without a due date and cancelled tasks are left out. Completed tasks stay with a ✓. A task with a start date before its due date spans both. Timed tasks are a point in time, and repeating tasks repeat. Priority and labels aren't shown.
+- **Tasks feed:** tasks without a due date and cancelled tasks are left out. Completed tasks stay with a ✓ (on their last date only, if they repeated). A task with a start date before its due date spans both. Timed tasks are a point in time, and repeating tasks repeat. Priority and labels aren't shown.
 
 ## Security
 

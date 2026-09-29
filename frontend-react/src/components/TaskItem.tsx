@@ -1,8 +1,8 @@
-import { Fragment, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import type { Task } from '../api/tasks.ts';
-import { describeDue } from '../format.ts';
+import { describeDue, describeRepeat } from '../format.ts';
 import { BLOCK_FIELDS, type RowField } from '../viewSettings.ts';
-import { CalendarIcon, CheckIcon, ChevronDownIcon, MapPinIcon, PencilIcon, SubtaskIcon, TagIcon } from './icons.tsx';
+import { CalendarIcon, CheckIcon, ChevronDownIcon, MapPinIcon, PencilIcon, RepeatIcon, SubtaskIcon, TagIcon } from './icons.tsx';
 
 interface Props {
   task: Task;
@@ -28,6 +28,8 @@ const COMPLETE_ANIMATION_MS = 300;
 
 export function TaskCheckbox({ task, onToggle }: { task: Task; onToggle: (task: Task) => void }) {
   const [checked, setChecked] = useState(task.completed);
+  // A repeating task comes back open on its next date (and a failed save flips a task back): drop the tick.
+  useEffect(() => setChecked(task.completed), [task.completed, task.ics]);
   return (
     <button
       type="button"
@@ -42,6 +44,17 @@ export function TaskCheckbox({ task, onToggle }: { task: Task; onToggle: (task: 
     >
       <CheckIcon />
     </button>
+  );
+}
+
+/** The repeat icon after a date, with the rule in words on hover. */
+export function RepeatMark({ task }: { task: Task }) {
+  if (!task.recurrence) return null;
+  const words = describeRepeat(task.recurrence, task.start ?? task.due);
+  return (
+    <span className="repeat-mark" title={words} aria-label={words}>
+      <RepeatIcon />
+    </span>
   );
 }
 
@@ -77,6 +90,8 @@ function renderField(field: RowField, task: Task, subtasks: Props['subtasks']): 
           <span className="label" title="Start date">
             <CalendarIcon />
             Starts {describeDue(task.start).label}
+            {/* A repeat usually sits on the due date; with none, the start date carries it. */}
+            {!task.due && <RepeatMark task={task} />}
           </span>
         )
       );
@@ -87,6 +102,7 @@ function renderField(field: RowField, task: Task, subtasks: Props['subtasks']): 
           <span className={`due due-${due.tone}`} title="Due date">
             <CalendarIcon />
             {due.label}
+            <RepeatMark task={task} />
           </span>
         )
       );

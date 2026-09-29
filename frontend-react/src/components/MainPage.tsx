@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Task, TaskEdits } from '../api/tasks.ts';
+import { describeDue } from '../format.ts';
 import { navigate, taskPath } from '../router.ts';
 import { ancestors, buildTree, descendants, type TaskTree } from '../taskTree.ts';
 import { useTaskList } from '../useTaskList.ts';
@@ -16,6 +17,7 @@ import {
   type ViewSettings,
 } from '../viewSettings.ts';
 import { FilterModal } from './FilterModal.tsx';
+import { ImportExportModal } from './ImportExportModal.tsx';
 import { ChevronDownIcon, FilterIcon, GearIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
@@ -134,6 +136,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   const [sharing, setSharing] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
   const [editingFilters, setEditingFilters] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [settings, setSettings] = useState(loadSettings);
 
   function changeSettings(next: ViewSettings) {
@@ -170,11 +173,34 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     setCollapsed(next);
   }
 
-  function setCompleted(task: Task, completed: boolean) {
+  /** `forGood` completes a repeating task instead of moving it to its next date. */
+  function setCompleted(task: Task, completed: boolean, forGood = false) {
     if (!completed) {
       // A sub-task reopened under a completed parent would be cut off from it: reopen the parents too.
       for (const t of [task, ...ancestors(tree, task).filter((a) => a.completed)]) list.setCompleted(t.href, false);
       return;
+    }
+    if (task.recurrence && !forGood) {
+      const before = task.ics;
+      // Like Todoist, a repeating task's checklist starts over: its completed sub-tasks open again.
+      const reopened = descendants(tree, task).filter((t) => t.completed);
+      const moved = list.advance(task.href);
+      if (moved) {
+        for (const t of reopened) list.setCompleted(t.href, false);
+        const next = moved.due ?? moved.start;
+        showToast({
+          message: next ? `Task completed. Next: ${describeDue(next).label}` : 'Task completed',
+          action: {
+            label: 'Undo',
+            run: () => {
+              list.restore(task.href, before);
+              for (const t of reopened) list.setCompleted(t.href, true);
+            },
+          },
+        });
+        return;
+      }
+      // No occurrence left (COUNT or UNTIL reached): completed for good, like any task.
     }
     // Like Todoist, completing a task completes its open sub-tasks; Undo reopens exactly those.
     const done = [task, ...descendants(tree, task).filter((t) => !t.completed)];
@@ -230,7 +256,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
   const openTasks = openRows(tasks, tree, collapsed, view);
   const completedTasks = tasks.filter((t) => t.completed && view.matches(t)).sort(compareCompleted);
   const openTask = openUid === undefined ? undefined : tasks.find((t) => t.uid === openUid);
-  const modalOpen = creating || sharing || editingSettings || editingFilters || openTask !== undefined;
+  const modalOpen = creating || sharing || editingSettings || editingFilters || transferring || openTask !== undefined;
 
   // A task link can point to another list (the URL has only the UID): look there and switch to it.
   const taskMissing = openUid !== undefined && !openTask && list.fetched;
@@ -458,6 +484,7 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           onClose={closeTask}
           onSave={(edits) => saveEdits(openTask, edits)}
           onToggle={toggleTask}
+          onCompleteForGood={(task) => setCompleted(task, true, true)}
           onOpenTask={openTaskPage}
           onAddSubtask={(summary) => addSubtask(openTask, summary)}
           showMap={settings.showMap}
@@ -469,7 +496,33 @@ export function MainPage({ session, openUid, onLogout }: Props) {
       )}
 
       {editingSettings && (
-        <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setEditingSettings(false)} />
+        <SettingsModal
+          settings={settings}
+          onChange={changeSettings}
+          onImportExport={
+            calendarHref
+              ? () => {
+                  setEditingSettings(false);
+                  setTransferring(true);
+                }
+              : undefined
+          }
+          onClose={() => setEditingSettings(false)}
+        />
+      )}
+
+      {calendarHref && transferring && (
+        <ImportExportModal
+          client={client}
+          calendars={calendars}
+          calendarHref={calendarHref}
+          compare={view.compare}
+          onImported={(href) => {
+            list.refresh(href);
+            selectCalendar(href);
+          }}
+          onClose={() => setTransferring(false)}
+        />
       )}
 
       {editingFilters && (

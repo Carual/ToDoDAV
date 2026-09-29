@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { CalDavError, type CalDavClient, type Calendar } from './api/caldav.ts';
-import { applyEdits, newTaskIcs, parseTask, withCompleted, type Task, type TaskEdits } from './api/tasks.ts';
+import {
+  applyEdits,
+  newTaskIcs,
+  parseTask,
+  restoredTo,
+  withCompleted,
+  withNextOccurrence,
+  type Task,
+  type TaskEdits,
+} from './api/tasks.ts';
 
 export interface WriteError {
   message: string;
@@ -148,14 +157,20 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
     );
   }
 
-  /** Shows the task's new content at once and saves it in the background. */
-  function change(href: string, apply: (task: Task) => string) {
+  /**
+   * Shows the task's new content at once and saves it in the background; returns the task as now shown.
+   * `apply` returning null changes nothing.
+   */
+  function change(href: string, apply: (task: Task) => string | null): Task | null {
     const current = find(href);
     const list = listOf(href);
-    if (!current || !list) return;
+    if (!current || !list) return null;
     const ics = apply(current);
-    replace(parseTask(href, current.etag, ics));
+    if (ics === null) return null;
+    const changed = parseTask(href, current.etag, ics);
+    replace(changed);
     enqueue(href, list, current, ics);
+    return changed;
   }
 
   function insert(list: string, href: string, ics: string) {
@@ -188,12 +203,22 @@ export function useTaskList({ client, calendarHref, onLogout, onWriteError }: Op
     reload: () => {
       if (calendarHref) void load(calendarHref);
     },
+    /** Fetches a list again, on screen or not (after an import wrote to it directly). */
+    refresh: (href: string) => void load(href),
     create: (list: string, edits: TaskEdits, parentUid?: string) => {
-      const { uid, ics } = newTaskIcs(edits, parentUid);
+      const { uid, ics } = newTaskIcs(edits, { parentUid });
       insert(list, client.taskHref(list, uid), ics);
     },
     edit: (href: string, edits: TaskEdits) => change(href, (task) => applyEdits(task, edits)),
-    setCompleted: (href: string, completed: boolean) => change(href, (task) => withCompleted(task, completed)),
+    setCompleted: (href: string, completed: boolean) => {
+      change(href, (task) => withCompleted(task, completed));
+    },
+    /** Moves a repeating task to its next occurrence: the moved task, or null when the repeat is over. */
+    advance: (href: string) => change(href, (task) => withNextOccurrence(task)),
+    /** Puts back content the task had before (Undo), as a new revision. */
+    restore: (href: string, ics: string) => {
+      change(href, (task) => restoredTo(task, ics));
+    },
     locate,
   };
 }

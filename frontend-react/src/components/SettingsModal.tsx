@@ -1,15 +1,17 @@
 import { useEffect } from 'react';
 import { DEFAULT_SETTINGS, ROW_FIELD_NAMES, type ListLayout, type ViewSettings } from '../viewSettings.ts';
-import { ChevronDownIcon, ChevronUpIcon, CloseIcon, GearIcon } from './icons.tsx';
+import { ChevronDownIcon, ChevronUpIcon, CloseIcon, GearIcon, TransferIcon } from './icons.tsx';
 
 interface Props {
   settings: ViewSettings;
   /** Changes apply at once, so the list behind shows the result. */
   onChange: (settings: ViewSettings) => void;
+  /** Opens the import and export dialog in place of this one. Absent when there is no task list. */
+  onImportExport?: () => void;
   onClose: () => void;
 }
 
-export function SettingsModal({ settings, onChange, onClose }: Props) {
+export function SettingsModal({ settings, onChange, onImportExport, onClose }: Props) {
   const { layout, fields } = settings;
 
   useEffect(() => {
@@ -124,6 +126,19 @@ export function SettingsModal({ settings, onChange, onClose }: Props) {
               ))}
             </ul>
           </section>
+
+          {onImportExport && (
+            <section className="settings-section">
+              <h2>Import and export</h2>
+              <div className="settings-row">
+                <p className="muted settings-note">Move tasks in or out as an .ics file or a Todoist CSV.</p>
+                <button type="button" className="btn btn-secondary settings-button" onClick={onImportExport}>
+                  <TransferIcon width={16} height={16} />
+                  Import or export
+                </button>
+              </div>
+            </section>
+          )}
         </div>
 
         <footer className="modal-footer">

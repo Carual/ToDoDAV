@@ -21,6 +21,7 @@ const REPORT_BODY =
 
 /** VTODO properties that mean the same in a VEVENT. Everything else (PRIORITY, CATEGORIES, X-...) is dropped. */
 const COPIED = ['uid', 'dtstamp', 'sequence', 'created', 'last-modified', 'description', 'location', 'url', 'class', 'rrule', 'rdate', 'exdate', 'recurrence-id'];
+const REPEAT = new Set(['rrule', 'rdate', 'exdate']);
 
 /**
  * /feed/tasks/<path>: one task list as a calendar of events, because Google Calendar ignores VTODOs.
@@ -175,7 +176,7 @@ function toEventCalendar(list: TaskList): string {
  * - No due date: left out, a calendar has nowhere to put it.
  * - Cancelled: left out. For an override of a repeating task it stays as a cancelled occurrence instead,
  *   because leaving it out would bring back the master's occurrence on that date.
- * - Completed: kept, with "✓ " before the title.
+ * - Completed: kept, with "✓ " before the title, and without its repeat.
  * - Start before due (same value type): spans start to due. Otherwise it sits on the due date alone.
  * - Timed: an instant (DTEND = DTSTART). All-day: DTEND is the next day, since DTEND is exclusive.
  * - Reminders (VALARM) are kept; the event is "free" so it never blocks time.
@@ -191,12 +192,15 @@ function toEvent(vtodo: ICAL.Component): ICAL.Component | undefined {
     event.addPropertyWithValue('status', 'CANCELLED');
   }
 
+  const completed = status === 'COMPLETED' || vtodo.hasProperty('completed');
   for (const name of COPIED) {
+    // A repeating task completed for good (ToDoDAV keeps its rule so reopening brings the repeat back) is
+    // done once, not ticked off on every future date.
+    if (completed && REPEAT.has(name)) continue;
     for (const property of vtodo.getAllProperties(name)) event.addProperty(copyAs(property, name));
   }
   if (!event.hasProperty('dtstamp')) event.addPropertyWithValue('dtstamp', ICAL.Time.fromJSDate(new Date(), true));
 
-  const completed = status === 'COMPLETED' || vtodo.hasProperty('completed');
   const summary = String(vtodo.getFirstPropertyValue('summary') ?? '');
   event.addPropertyWithValue('summary', completed ? `✓ ${summary}` : summary);
 

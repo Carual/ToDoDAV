@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Calendar } from '../api/caldav.ts';
 import { sameDate, type LocalDate, type Priority, type Task, type TaskEdits } from '../api/tasks.ts';
 import { describeDue, formatDateTime } from '../format.ts';
+import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../repeat.ts';
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { CloseIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon } from './icons.tsx';
-import { TaskCheckbox } from './TaskItem.tsx';
+import { CheckIcon, CloseIcon, FlagIcon, HashIcon, MapPinIcon, PlusIcon, RepeatIcon } from './icons.tsx';
+import { RepeatField } from './RepeatField.tsx';
+import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
 
 interface Props {
   /** The task to show and edit; absent when adding a new one. */
@@ -18,8 +20,10 @@ interface Props {
   onClose: () => void;
   /** Takes the edits and closes the modal at once; the save runs in the background. */
   onSave: (edits: TaskEdits) => void;
-  /** Completes an open task or reopens a completed one. */
+  /** Completes an open task or reopens a completed one; a repeating task moves to its next date instead. */
   onToggle: (task: Task) => void;
+  /** Completes a repeating task for good instead of moving it to its next date. */
+  onCompleteForGood?: (task: Task) => void;
   /** Shows another task (a parent or a sub-task) in place of this one. */
   onOpenTask?: (task: Task) => void;
   /** Adds an open sub-task with this name; the save runs in the background. */
@@ -42,6 +46,7 @@ function initialEdits(task: Task | undefined): TaskEdits {
     priority: task.priority,
     categories: task.categories,
     location: task.location ?? '',
+    recurrence: task.recurrence,
   };
 }
 
@@ -53,7 +58,8 @@ function sameEdits(a: TaskEdits, b: TaskEdits): boolean {
     sameDate(a.due, b.due) &&
     a.priority === b.priority &&
     a.categories.join('\n') === b.categories.join('\n') &&
-    a.location === b.location
+    a.location === b.location &&
+    a.recurrence === b.recurrence
   );
 }
 
@@ -87,7 +93,7 @@ function problemWith(edits: TaskEdits): string | null {
   if (edits.start && edits.due && sortKey(edits.start) > sortKey(edits.due)) {
     return 'The start date must be before the due date.';
   }
-  return null;
+  return edits.recurrence ? repeatProblem(edits.recurrence, edits.start ?? edits.due) : null;
 }
 
 export function TaskModal({
@@ -98,6 +104,7 @@ export function TaskModal({
   onClose,
   onSave,
   onToggle,
+  onCompleteForGood,
   onOpenTask,
   onAddSubtask,
   showMap = false,
@@ -111,8 +118,15 @@ export function TaskModal({
 
   const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
   const dirty = !sameEdits(edits, initialEdits(task));
-  // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type).
-  const finalEdits: TaskEdits = { ...edits, start: inMode(edits.start, allDay), due: inMode(edits.due, allDay) };
+  // What gets saved: both dates brought to the chosen mode (RFC 5545 wants DTSTART and DUE of the same type,
+  // and the repeat's UNTIL of that type too).
+  const finalEdits: TaskEdits = {
+    ...edits,
+    start: inMode(edits.start, allDay),
+    due: inMode(edits.due, allDay),
+    recurrence: edits.recurrence && withUntilFor(edits.recurrence, allDay),
+  };
+  const repeatAnchor = finalEdits.start ?? finalEdits.due ?? todayDate();
   const problem = problemWith(finalEdits);
   const canSave = dirty && !problem;
 
@@ -124,6 +138,24 @@ export function TaskModal({
   function toggleAllDay(next: boolean) {
     setAllDay(next);
     update({ start: inMode(edits.start, next), due: inMode(edits.due, next) });
+  }
+
+  /** A new date also moves a repeat that follows it ("every week on Friday" becomes Monday's). */
+  function changeDate(field: 'start' | 'due', value: LocalDate | undefined) {
+    const from = edits.start ?? edits.due;
+    const to = field === 'start' ? (value ?? edits.due) : (edits.start ?? value);
+    const { recurrence } = edits;
+    update({ [field]: value, recurrence: recurrence && from && to ? moveRule(recurrence, from, to, allDay) : recurrence });
+  }
+
+  function changeRepeat(recurrence: string | undefined) {
+    if (!recurrence) return update({ recurrence });
+    // As in Todoist, a repeat on a task without a date starts today...
+    const due = edits.start || edits.due ? edits.due : inMode(todayDate(), allDay);
+    // ...and on its first occurrence: "every Monday" chosen on a Friday moves the task to Monday.
+    const anchor = edits.start ?? due!;
+    const shift = daysBetween(anchor, firstOccurrence(recurrence, anchor));
+    update({ recurrence, start: addDaysTo(edits.start, shift), due: addDaysTo(due, shift) });
   }
 
   // One question at a time: every way out (close controls, Back/Forward) waits on the same answer.
@@ -341,8 +373,15 @@ export function TaskModal({
                 </label>
               }
             >
-              <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => update({ start })} />
-              <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => update({ due })} />
+              <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => changeDate('start', start)} />
+              <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => changeDate('due', due)} />
+              <RepeatField value={edits.recurrence} anchor={repeatAnchor} allDay={allDay} onChange={changeRepeat} />
+              {edits.recurrence && !edits.start && !edits.due && (
+                <p className="repeat-note repeat-note-warning">
+                  <RepeatIcon />
+                  Without a date, the repeat is removed too.
+                </p>
+              )}
             </SidebarItem>
 
             <SidebarItem title="Priority">
@@ -434,6 +473,20 @@ export function TaskModal({
         </div>
 
         <footer className="modal-footer">
+          {task?.recurrence && !task.completed && onCompleteForGood && (
+            <button
+              type="button"
+              className="btn btn-link complete-for-good"
+              title="Complete this task and stop repeating it (reopening it brings the repeat back)"
+              onClick={() => {
+                onCompleteForGood(task);
+                onClose();
+              }}
+            >
+              <CheckIcon />
+              Complete for good
+            </button>
+          )}
           <span className="modal-footer-message" role="alert">
             {message}
           </span>
@@ -521,7 +574,12 @@ function SubtaskRow({ task, onOpen, onToggle }: { task: Task; onOpen?: (task: Ta
     <li className={`subtask${task.completed ? ' task-done' : ''}`} onClick={() => onOpen?.(task)}>
       <TaskCheckbox task={task} onToggle={onToggle} />
       <span className="task-title">{task.summary || <span className="muted">Untitled task</span>}</span>
-      {due && <span className={`due due-${due.tone}`}>{due.label}</span>}
+      {due && (
+        <span className={`due due-${due.tone}`}>
+          {due.label}
+          <RepeatMark task={task} />
+        </span>
+      )}
     </li>
   );
 }

@@ -595,6 +595,12 @@ button {
   color: var(--text-tertiary);
 }
 
+/* The repeat icon rides after a date, in the date's color. */
+.repeat-mark {
+  display: inline-flex;
+  margin-left: 2px;
+}
+
 /* Location on a line of its own, cut short like the description. */
 .task-location {
   display: flex;
@@ -986,6 +992,14 @@ button {
   background: var(--bg);
 }
 
+.complete-for-good {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
 .modal-footer-message {
   flex: 1;
   min-width: 0;
@@ -1204,6 +1218,113 @@ button {
   font-size: 12px;
 }
 
+/* Repeat: a select, and the custom form under it */
+.repeat-field {
+  margin-top: 10px;
+}
+
+.repeat-field select {
+  width: 100%;
+}
+
+.repeat-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--divider);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.repeat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.repeat-row > span {
+  flex-shrink: 0;
+}
+
+.repeat-row select,
+.repeat-row input[type='date'] {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.repeat-custom .sidebar-text {
+  padding: 3px 6px;
+}
+
+.repeat-custom .sidebar-text:focus {
+  border-color: var(--text-tertiary);
+}
+
+.repeat-number {
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.repeat-days {
+  display: flex;
+  justify-content: space-between;
+  gap: 2px;
+}
+
+.repeat-day {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.repeat-day:hover {
+  border-color: var(--text-tertiary);
+}
+
+.repeat-day.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.repeat-day:focus-visible {
+  outline: 2px solid var(--p3);
+  outline-offset: 1px;
+}
+
+.repeat-summary {
+  color: var(--text-secondary);
+}
+
+.repeat-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.repeat-note svg {
+  flex-shrink: 0;
+}
+
+.repeat-note-warning {
+  color: var(--due-overdue);
+}
+
 .priority-select {
   display: inline-flex;
   align-items: center;
@@ -1413,6 +1534,105 @@ button {
 
 .settings-select:focus {
   border-color: var(--text-tertiary);
+}
+
+.settings-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* ---------- Import and export ---------- */
+
+.transfer-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.transfer-actions .btn[aria-busy='true'] {
+  min-width: 72px;
+}
+
+.transfer-status {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.transfer-message {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.transfer-message.form-error {
+  margin-bottom: 0;
+}
+
+/* A label styled as a button opens the file picker; the input stays reachable by keyboard. */
+.transfer-file {
+  position: relative;
+  cursor: pointer;
+}
+
+.transfer-file input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.transfer-file:focus-within {
+  outline: 2px solid var(--text-tertiary);
+  outline-offset: 1px;
+}
+
+.transfer-file-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.transfer-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.transfer-progress .spinner {
+  display: flex;
+  width: 18px;
+  height: 18px;
+}
+
+.transfer-warnings,
+.transfer-failures {
+  margin: 8px 0 0;
+  padding: 8px 10px 8px 28px;
+  border-radius: 5px;
+  background: var(--bg-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.transfer-failures {
+  padding-left: 10px;
+}
+
+.transfer-failures p {
+  margin: 0 0 4px;
+}
+
+.transfer-failures ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 120px;
+  overflow: auto;
 }
 
 .priority-toggles {

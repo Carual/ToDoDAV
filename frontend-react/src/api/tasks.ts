@@ -29,6 +29,8 @@ export interface Task {
   url?: string;
   /** UID of the task this one is a sub-task of (RELATED-TO). */
   parentUid?: string;
+  /** The RRULE value (`FREQ=WEEKLY;BYDAY=FR`) when the task repeats; it counts from DTSTART, or else DUE. */
+  recurrence?: string;
   created?: Date;
   lastModified?: Date;
   completedAt?: Date;
@@ -46,6 +48,8 @@ export interface TaskEdits {
   priority: Priority;
   categories: string[];
   location: string;
+  /** The RRULE value, counting from `start`, or else `due`; absent when the task doesn't repeat. */
+  recurrence?: string;
 }
 
 // iCalendar PRIORITY is 1 (highest) to 9 (lowest), 0 = undefined. Same mapping as Tasks.org / DAVx5.
@@ -67,7 +71,9 @@ function parse(ics: string) {
       // A broken VTIMEZONE only makes times fall back to floating local time.
     }
   }
-  const vtodo = vcalendar.getFirstSubcomponent('vtodo');
+  // A repeating task can share its file with overrides of single occurrences (RECURRENCE-ID), in any order.
+  const todos = vcalendar.getAllSubcomponents('vtodo');
+  const vtodo = todos.find((todo) => !todo.hasProperty('recurrence-id')) ?? todos[0];
   if (!vtodo) throw new Error('No VTODO in calendar object');
   return { vcalendar, vtodo };
 }
@@ -103,6 +109,7 @@ export function parseTask(href: string, etag: string, ics: string): Task {
   };
   const status = text('status')?.toUpperCase();
   const percent = text('percent-complete');
+  const rrule = vtodo.getFirstPropertyValue('rrule');
 
   return {
     href,
@@ -124,6 +131,7 @@ export function parseTask(href: string, etag: string, ics: string): Task {
     location: text('location'),
     url: text('url'),
     parentUid: parentUidOf(vtodo),
+    recurrence: rrule instanceof ICAL.Recur ? rrule.toString() : undefined,
     created: toDate(vtodo.getFirstPropertyValue('created')),
     lastModified: toDate(vtodo.getFirstPropertyValue('last-modified')),
     completedAt: toDate(vtodo.getFirstPropertyValue('completed')),
@@ -167,6 +175,16 @@ function writeEdits(vtodo: ICAL.Component, edits: TaskEdits, previous?: Task) {
     vtodo.removeAllProperties('duration'); // DUE and DURATION cannot coexist
     setDate(vtodo, 'due', edits.due);
   }
+  // Untouched, a rule stays exactly as written (other apps' rules can say more than the modal can show).
+  const repeatRemoved = previous?.recurrence !== undefined && !edits.recurrence;
+  if ((edits.recurrence ?? '') !== (previous?.recurrence ?? '')) {
+    vtodo.removeAllProperties('rrule');
+    if (edits.recurrence) vtodo.addPropertyWithValue('rrule', ICAL.Recur.fromString(edits.recurrence));
+  }
+  // A repeat counts from DTSTART or DUE; with neither left, it has nothing to count from.
+  if (repeatRemoved || (!edits.start && !edits.due)) {
+    for (const name of ['rrule', 'rdate', 'exdate']) vtodo.removeAllProperties(name);
+  }
 
   if (edits.priority === 4) vtodo.removeAllProperties('priority');
   else vtodo.updatePropertyWithValue('priority', PRIORITY_TO_ICAL[edits.priority]);
@@ -191,12 +209,18 @@ function writeEdits(vtodo: ICAL.Component, edits: TaskEdits, previous?: Task) {
 export function applyEdits(task: Task, edits: TaskEdits): string {
   const { vcalendar, vtodo } = parse(task.ics);
   writeEdits(vtodo, edits, task);
+  // Changed single occurrences (RECURRENCE-ID) mean nothing once the task no longer repeats.
+  if (!vtodo.hasProperty('rrule') && !vtodo.hasProperty('rdate')) {
+    for (const other of vcalendar.getAllSubcomponents('vtodo')) {
+      if (other !== vtodo && other.hasProperty('recurrence-id')) vcalendar.removeSubcomponent(other);
+    }
+  }
   touch(vtodo);
   return vcalendar.toString();
 }
 
 /** A random UUID. crypto.randomUUID only exists on HTTPS/localhost; getRandomValues works everywhere. */
-function newUid(): string {
+export function newUid(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   bytes[6] = (bytes[6]! & 0x0f) | 0x40; // version 4
@@ -205,8 +229,13 @@ function newUid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-/** iCalendar text for a brand-new open task (a sub-task when `parentUid` is given), and the UID it was given. */
-export function newTaskIcs(edits: TaskEdits, parentUid?: string): { uid: string; ics: string } {
+export interface NewTaskOptions {
+  /** Makes it a sub-task of this task. */
+  parentUid?: string;
+}
+
+/** iCalendar text for a brand-new open task, and the UID it was given. */
+export function newTaskIcs(edits: TaskEdits, { parentUid }: NewTaskOptions = {}): { uid: string; ics: string } {
   const uid = newUid();
   const vcalendar = new ICAL.Component('vcalendar');
   vcalendar.updatePropertyWithValue('version', '2.0');
@@ -229,6 +258,112 @@ export function newTaskIcs(edits: TaskEdits, parentUid?: string): { uid: string;
   writeEdits(vtodo, edits);
 
   return { uid, ics: vcalendar.toString() };
+}
+
+const SUB_DAILY = new Set(['HOURLY', 'MINUTELY', 'SECONDLY']);
+const localDay = (value: ICAL.Time) => toLocalDate(value)!.date;
+const dayString = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+/**
+ * Moves a date by whole days on the clock the task is shown in: 09:00 stays 09:00 across a DST change.
+ * TZID and floating times move in their own zone; UTC times (what ToDoDAV writes) in the browser's.
+ */
+function shiftDays(value: ICAL.Time, days: number): ICAL.Time {
+  if (value.isDate || value.zone !== ICAL.Timezone.utcTimezone) {
+    const moved = value.clone();
+    moved.adjust(days, 0, 0, 0);
+    return moved;
+  }
+  const local = value.toJSDate();
+  local.setDate(local.getDate() + days);
+  return ICAL.Time.fromJSDate(local, true);
+}
+
+/**
+ * The task moved to its next occurrence and open again, which is what completing a repeating task does (as
+ * in Todoist, Tasks.org and Thunderbird): one VTODO that moves along, rather than one per occurrence. The
+ * next occurrence is the first after the current one and after today, so an overdue task comes back once,
+ * in the future. Start and due move together; skipped dates (EXDATE) are skipped. Returns null when the
+ * repeat has no occurrence left (COUNT, UNTIL), so the task should be completed for good instead.
+ */
+export function withNextOccurrence(task: Task, now = new Date()): string | null {
+  const { vcalendar, vtodo } = parse(task.ics);
+  const ruleProperty = vtodo.getFirstProperty('rrule');
+  const rule = ruleProperty?.getFirstValue();
+  const anchorProperty = vtodo.getFirstProperty('dtstart') ?? vtodo.getFirstProperty('due');
+  const anchor = anchorProperty?.getFirstValue();
+  if (!ruleProperty || !(rule instanceof ICAL.Recur) || !(anchor instanceof ICAL.Time)) return null;
+
+  const times = (name: string) =>
+    vtodo
+      .getAllProperties(name)
+      .flatMap((property) => property.getValues())
+      .filter((value): value is ICAL.Time => value instanceof ICAL.Time);
+  const subDaily = SUB_DAILY.has(rule.freq);
+  // Daily and longer rules step through days, so the time of day stays what the user sees. Keys are strings
+  // that sort like the moments they stand for.
+  const seconds = (s: number) => String(Math.floor(s)).padStart(12, '0');
+  const keyOf = (t: ICAL.Time) => (subDaily ? seconds(t.toUnixTime()) : localDay(t));
+  const excluded = new Set(times('exdate').map(keyOf));
+  const floor = subDaily
+    ? seconds(Math.max(anchor.toUnixTime(), now.getTime() / 1000))
+    : [localDay(anchor), dayString(now)].sort().at(-1)!;
+  const after = (key: string) => key > floor && !excluded.has(key);
+
+  // The pattern alone; its end is checked below, by date.
+  const pattern = rule.clone();
+  pattern.count = null;
+  pattern.until = null;
+  const iterator = pattern.iterator(subDaily ? anchor : ICAL.Time.fromDateString(localDay(anchor)));
+  /** Occurrences before the next one, the current one included: what COUNT has used up. */
+  let used = 0;
+  let next: ICAL.Time | undefined;
+  for (let i = 0; i < 100_000; i++) {
+    const occurrence = iterator.next();
+    if (!occurrence) break;
+    if (after(keyOf(occurrence))) {
+      next = occurrence;
+      break;
+    }
+    used++;
+  }
+  if (!next || (rule.count && used >= rule.count) || (rule.until && keyOf(next) > keyOf(rule.until))) return null;
+  // Extra dates (RDATE) are left alone: moving DTSTART onto one would move what the rule leaves implicit
+  // (FREQ=WEEKLY would follow the extra date's weekday). Task apps hardly ever write them.
+
+  for (const name of ['dtstart', 'due']) {
+    const property = vtodo.getFirstProperty(name);
+    const value = property?.getFirstValue();
+    if (!property || !(value instanceof ICAL.Time)) continue;
+    if (subDaily) {
+      const moved = value.clone();
+      moved.addDuration(ICAL.Duration.fromSeconds(next.toUnixTime() - anchor.toUnixTime()));
+      property.setValue(moved);
+    } else {
+      const days = Math.round((Date.parse(localDay(next)) - Date.parse(localDay(anchor))) / 86_400_000);
+      property.setValue(shiftDays(value, days));
+    }
+  }
+  // COUNT counts from DTSTART, which just moved past the used-up occurrences.
+  if (rule.count) {
+    const remaining = rule.clone();
+    remaining.count = rule.count - used;
+    ruleProperty.setValue(remaining);
+  }
+
+  vtodo.updatePropertyWithValue('status', 'NEEDS-ACTION');
+  vtodo.removeAllProperties('completed');
+  vtodo.removeAllProperties('percent-complete');
+  touch(vtodo);
+  return vcalendar.toString();
+}
+
+/** The task's earlier content saved again as a new revision (Undo), so other clients see it as newer. */
+export function restoredTo(task: Task, ics: string): string {
+  const { vcalendar, vtodo } = parse(ics);
+  vtodo.updatePropertyWithValue('sequence', Number(parse(task.ics).vtodo.getFirstPropertyValue('sequence') ?? 0));
+  touch(vtodo);
+  return vcalendar.toString();
 }
 
 /** Returns the task's iCalendar text marked as completed (or as open again). */
