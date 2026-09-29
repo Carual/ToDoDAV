@@ -225,6 +225,20 @@ export function MainPage({ session, openUid, onLogout }: Props) {
     });
   }
 
+  /** Like Todoist, deleting a task deletes its sub-tasks too; Undo stores them all again as they were. */
+  function deleteTask(task: Task) {
+    const doomed = [task, ...descendants(tree, task)].flatMap((t) => {
+      const listHref = list.listOf(t);
+      return listHref ? [{ task: t, listHref }] : [];
+    });
+    for (const { task: t } of doomed) list.delete(t.href);
+    const extra = doomed.length - 1;
+    showToast({
+      message: extra > 0 ? `Task and ${plural(extra, 'sub-task')} deleted` : 'Task deleted',
+      action: { label: 'Undo', run: () => doomed.forEach(({ task: t, listHref }) => list.undelete(listHref, t)) },
+    });
+  }
+
   /** Shows one list, or every list with ALL. */
   function selectCalendar(href: string) {
     setSelected(href);
@@ -520,6 +534,8 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           onSave={(edits) => saveEdits(openTask, edits)}
           onToggle={toggleTask}
           onCompleteForGood={(task) => setCompleted(task, true, true)}
+          onDelete={deleteTask}
+          descendantCount={descendants(tree, openTask).length}
           onOpenTask={openTaskPage}
           onAddSubtask={(summary) => addSubtask(openTask, summary)}
           showMap={settings.showMap}

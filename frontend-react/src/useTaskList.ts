@@ -60,11 +60,11 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
   const [loadErrors, setLoadErrors] = useState<Readonly<Record<string, string>>>({});
   const loadIds = useRef(new Map<string, number>());
   /**
-   * Saves still on their way, per task href; each resolves to the task as the server then has it. Saves to
-   * one task go one at a time, each with the ETag the previous one got back, so quick successive changes
-   * (edit, complete, Undo) never trip If-Match on each other.
+   * Saves still on their way, per task href; each resolves to the task as the server then has it (null once
+   * deleted). Saves to one task go one at a time, each with the ETag the previous one got back, so quick
+   * successive changes (edit, complete, Undo, delete) never trip If-Match on each other.
    */
-  const pending = useRef(new Map<string, Promise<Task>>());
+  const pending = useRef(new Map<string, Promise<Task | null>>());
   const callbacks = useRef({ onLogout, onWriteError });
   useEffect(() => {
     callbacks.current = { onLogout, onWriteError };
@@ -75,12 +75,15 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
     setListsState(listsRef.current);
   }, []);
 
-  /** Fresh tasks from the server, keeping the local version of those with a save still in flight. */
+  /**
+   * Fresh tasks from the server, keeping the local version of those with a save still in flight. A task with
+   * a save in flight that is gone locally is being deleted, so it stays gone.
+   */
   const withPending = useCallback((local: Task[] | undefined, fresh: Task[]): Task[] => {
     const inFlight = (local ?? NO_TASKS).filter((t) => pending.current.has(t.href));
     const freshHrefs = new Set(fresh.map((t) => t.href));
     return [
-      ...fresh.map((t) => inFlight.find((l) => l.href === t.href) ?? t),
+      ...fresh.flatMap((t) => (pending.current.has(t.href) ? inFlight.filter((l) => l.href === t.href) : [t])),
       ...inFlight.filter((t) => !freshHrefs.has(t.href)), // created here, not stored yet
     ];
   }, []);
@@ -133,15 +136,26 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
   const replace = (task: Task) =>
     setLists((current) => mapLists(current, (tasks) => tasks.map((t) => (t.href === task.href ? task : t))));
   const remove = (href: string) => setLists((current) => mapLists(current, (tasks) => tasks.filter((t) => t.href !== href)));
+  /** Replaces the task in `list`, or adds it back there if it was removed (a delete that failed). */
+  const putBack = (list: string, task: Task) =>
+    setLists((current) => {
+      const tasks = current[list] ?? NO_TASKS;
+      const present = tasks.some((t) => t.href === task.href);
+      return { ...current, [list]: present ? tasks.map((t) => (t.href === task.href ? task : t)) : [...tasks, task] };
+    });
 
   /**
-   * Saves `ics` as the task's content once the saves before it are done. `confirmedNow` is the task as the
-   * server has it when nothing is queued (null for a task not created yet).
+   * Saves `ics` as the task's content (null deletes it) once the saves before it are done. `confirmedNow` is
+   * the task as the server has it when nothing is queued (null for a task not created yet).
    */
-  function enqueue(href: string, list: string, confirmedNow: Task | null, ics: string) {
+  function enqueue(href: string, list: string, confirmedNow: Task | null, ics: string | null) {
     const previous: Promise<Task | null> = pending.current.get(href) ?? Promise.resolve(confirmedNow);
     const write = previous.then(async (confirmed) => {
       try {
+        if (ics === null) {
+          if (confirmed) await client.deleteTask(confirmed);
+          return null;
+        }
         return await (confirmed ? client.saveTask(confirmed, ics) : client.createTask(href, ics));
       } catch (error) {
         throw new WriteFailure(confirmed, error);
@@ -153,6 +167,7 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
       (saved) => {
         if (pending.current.get(href) !== write) return; // a newer save is queued and settles the task
         pending.current.delete(href);
+        if (!saved) return; // deleted, and already gone from the list
         if (saved.etag) replace(saved);
         else void load(list); // the server did not send the new ETag: reload to get it
       },
@@ -161,16 +176,20 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
         pending.current.delete(href);
         const { confirmed, error } = reason as WriteFailure;
         const listNow = listOf(href) ?? list;
-        if (confirmed) replace(confirmed);
+        if (confirmed) putBack(listNow, confirmed);
         else remove(href);
+        // Deleted before it was ever stored: nothing is left to report.
+        if (ics === null && !confirmed) return;
 
         if (error instanceof CalDavError && error.status === 401) return callbacks.current.onLogout();
         const unreachable = error instanceof CalDavError && error.status === 0;
         // The server refused (conflict, gone, error): show what it has now. Retrying would overwrite that.
         if (!unreachable) void load(listNow);
+        const retry =
+          ics === null ? () => destroy(href) : confirmed ? () => change(href, () => ics) : () => insert(listNow, href, ics);
         callbacks.current.onWriteError({
           message: error instanceof Error ? error.message : 'Could not save the task.',
-          retry: unreachable ? () => (confirmed ? change(href, () => ics) : insert(listNow, href, ics)) : undefined,
+          retry: unreachable ? retry : undefined,
         });
       },
     );
@@ -195,6 +214,15 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
   function insert(list: string, href: string, ics: string) {
     setLists((current) => ({ ...current, [list]: [...(current[list] ?? NO_TASKS), parseTask(href, '', ics)] }));
     enqueue(href, list, null, ics);
+  }
+
+  /** Removes the task at once and deletes it in the background. */
+  function destroy(href: string) {
+    const current = find(href);
+    const list = listOf(href);
+    if (!current || !list) return;
+    remove(href);
+    enqueue(href, list, current, null);
   }
 
   /** Finds the list holding a task among `calendars`, keeping every list it loads for later. */
@@ -241,6 +269,10 @@ export function useTaskList({ client, calendarHrefs, onLogout, onWriteError }: O
     restore: (href: string, ics: string) => {
       change(href, (task) => restoredTo(task, ics));
     },
+    /** Deletes a task for good (sub-tasks are the caller's to delete too). */
+    delete: destroy,
+    /** Stores a deleted task again, exactly as it was (Undo), under its old href. */
+    undelete: (list: string, task: Task) => insert(list, task.href, task.ics),
     locate,
   };
 }

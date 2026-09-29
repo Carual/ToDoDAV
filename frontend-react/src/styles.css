@@ -365,6 +365,49 @@ button {
   color: var(--accent);
 }
 
+/* A menu of actions (Menu.tsx), under its three-dots button. */
+.menu-trigger[aria-expanded='true'] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.menu [role='menu'] {
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 4px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+  outline: none;
+}
+
+.menu-item svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+}
+
+.menu-item:focus {
+  background: var(--bg-hover);
+}
+
+.menu-item-danger,
+.menu-item-danger svg {
+  color: var(--p1);
+}
+
 /* Date: the calendar icon, then the date in its due color. */
 .date-trigger-icon {
   flex-shrink: 0;
@@ -1168,6 +1211,14 @@ button {
   border-bottom: 1px solid var(--divider);
 }
 
+/* The three-dots menu, then the close button. */
+.modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
 .modal-crumb {
   display: inline-flex;
   align-items: center;
@@ -1465,14 +1516,6 @@ button {
   padding: 10px 16px;
   border-top: 1px solid var(--divider);
   background: var(--bg);
-}
-
-.complete-for-good {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-  font-size: 12px;
 }
 
 .modal-footer-message {

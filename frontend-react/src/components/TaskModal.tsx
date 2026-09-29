@@ -8,7 +8,19 @@ import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, today
 import { useLeaveGuard } from '../router.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { DatePicker } from './DatePicker.tsx';
-import { CheckIcon, CloseIcon, DownloadIcon, FlagIcon, HashIcon, MapPinIcon, PencilIcon, PlusIcon, RepeatIcon } from './icons.tsx';
+import {
+  CheckIcon,
+  CloseIcon,
+  DownloadIcon,
+  FlagIcon,
+  HashIcon,
+  MapPinIcon,
+  PencilIcon,
+  PlusIcon,
+  RepeatIcon,
+  TrashIcon,
+} from './icons.tsx';
+import { Menu, type MenuItem } from './Menu.tsx';
 import { RepeatField } from './RepeatField.tsx';
 import { Select } from './Select.tsx';
 import { RepeatMark, TaskCheckbox } from './TaskItem.tsx';
@@ -35,6 +47,10 @@ interface Props {
   onToggle: (task: Task) => void;
   /** Completes a repeating task for good instead of moving it to its next date. */
   onCompleteForGood?: (task: Task) => void;
+  /** Deletes the task and its sub-tasks, once the user has confirmed. */
+  onDelete?: (task: Task) => void;
+  /** Sub-tasks at any depth, which deleting the task deletes too. */
+  descendantCount?: number;
   /** Shows another task (a parent or a sub-task) in place of this one. */
   onOpenTask?: (task: Task) => void;
   /** Adds an open sub-task with this name; the save runs in the background. */
@@ -117,6 +133,8 @@ export function TaskModal({
   onSave,
   onToggle,
   onCompleteForGood,
+  onDelete,
+  descendantCount = 0,
   onOpenTask,
   onAddSubtask,
   showMap = false,
@@ -247,9 +265,37 @@ export function TaskModal({
     onClose();
   }
 
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  /** The three-dots menu in the header: actions that are rarely needed or can't be taken back as easily. */
+  const menuItems: MenuItem[] = [];
+  if (task?.recurrence && !task.completed && onCompleteForGood) {
+    menuItems.push({
+      label: 'Complete for good',
+      icon: <CheckIcon />,
+      title: 'Complete this task and stop repeating it (reopening it brings the repeat back)',
+      onSelect: () => {
+        onCompleteForGood(task);
+        onClose();
+      },
+    });
+  }
+  if (task) {
+    // The file as stored on the server (reminders, repeats and overrides included), not the unsaved edits.
+    menuItems.push({
+      label: 'Download as .ics',
+      icon: <DownloadIcon />,
+      title: 'Download the saved version as an iCalendar file',
+      onSelect: () => download(fileName(plainText(task.summary), 'ics', 'task'), task.ics, 'text/calendar'),
+    });
+  }
+  if (task && onDelete) {
+    menuItems.push({ label: 'Delete', icon: <TrashIcon />, danger: true, onSelect: () => setConfirmingDelete(true) });
+  }
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (askingLeave) return; // the dialog on top owns the keyboard
+      if (askingLeave || confirmingDelete) return; // the dialog on top owns the keyboard
       if (event.key === 'Escape') requestClose();
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) save();
     };
@@ -298,9 +344,12 @@ export function TaskModal({
               </>
             )}
           </span>
-          <button type="button" className="icon-btn" aria-label="Close" onClick={requestClose}>
-            <CloseIcon />
-          </button>
+          <div className="modal-header-actions">
+            {menuItems.length > 0 && <Menu aria-label="More actions" items={menuItems} />}
+            <button type="button" className="icon-btn" aria-label="Close" onClick={requestClose}>
+              <CloseIcon />
+            </button>
+          </div>
         </header>
 
         <div className="modal-content">
@@ -567,35 +616,9 @@ export function TaskModal({
         </div>
 
         <footer className="modal-footer">
-          {task?.recurrence && !task.completed && onCompleteForGood && (
-            <button
-              type="button"
-              className="btn btn-link complete-for-good"
-              title="Complete this task and stop repeating it (reopening it brings the repeat back)"
-              onClick={() => {
-                onCompleteForGood(task);
-                onClose();
-              }}
-            >
-              <CheckIcon />
-              Complete for good
-            </button>
-          )}
           <span className="modal-footer-message" role="alert">
             {message}
           </span>
-          {task && (
-            // The file as stored on the server (reminders, repeats and overrides included), not the unsaved edits.
-            <button
-              type="button"
-              className="icon-btn"
-              aria-label="Download as .ics"
-              title="Download as .ics (the saved version)"
-              onClick={() => download(fileName(plainText(task.summary), 'ics', 'task'), task.ics, 'text/calendar')}
-            >
-              <DownloadIcon />
-            </button>
-          )}
           <button type="button" className="btn btn-secondary" onClick={requestClose}>
             Cancel
           </button>
@@ -628,6 +651,24 @@ export function TaskModal({
           onConfirm={saveAndLeave}
           onCancel={() => answerLeave(false)}
           alternative={{ label: 'Discard', onClick: () => answerLeave(true) }}
+        />
+      )}
+
+      {confirmingDelete && task && onDelete && (
+        <ConfirmDialog
+          title="Delete task?"
+          message={`“${plainText(task.summary) || 'Untitled task'}”${
+            descendantCount > 0
+              ? ` and its ${descendantCount} sub-task${descendantCount === 1 ? '' : 's'} will be deleted.`
+              : ' will be deleted.'
+          }`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            // Unsaved edits go with it: there is nothing left to save them to.
+            onClose();
+            onDelete(task);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
         />
       )}
     </div>

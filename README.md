@@ -9,7 +9,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - **No lost edits.** If a task was changed on another device while you were editing it, ToDoDAV refuses to overwrite it and reloads the list instead.
 - **Tiny to run.** One small Node/Bun process. Built and tested against Radicale.
 
-> **Status:** early (v0.1). Usable day to day for viewing, adding, editing and completing tasks. Deleting tasks and moving them between lists are not there yet.
+> **Status:** early (v0.1). Usable day to day for viewing, adding, editing, completing and deleting tasks. Moving them between lists is not there yet.
 
 ## Features
 

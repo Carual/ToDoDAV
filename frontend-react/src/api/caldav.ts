@@ -163,6 +163,18 @@ export class CalDavClient {
     return parseTask(href, response.headers.get('ETag') ?? '', ics);
   }
 
+  /**
+   * Deletes a task, only if nobody changed it since it was loaded (If-Match); otherwise throws a 412 CalDavError.
+   * A task already gone counts as deleted.
+   */
+  async deleteTask(task: Task): Promise<void> {
+    try {
+      await this.send('DELETE', task.href, { headers: { 'If-Match': task.etag } });
+    } catch (error) {
+      if (!(error instanceof CalDavError && error.status === 404)) throw error;
+    }
+  }
+
   /** The backend's settings. Not CalDAV, but it needs the same credentials as every /proxy request. */
   async serverConfig(): Promise<ServerConfig> {
     const response = await fetch(`${this.origin}/api/config`, { headers: { Authorization: this.authorization } });

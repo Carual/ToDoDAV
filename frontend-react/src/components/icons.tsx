@@ -184,6 +184,30 @@ export function DownloadIcon(props: IconProps) {
   );
 }
 
+/** Three dots: more actions. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="6.5" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.25" fill="currentColor" />
+      <circle cx="17.5" cy="12" r="1.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
+      <path
+        d="M2.5 4.5h11M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4 4.5l.6 8.1a1.5 1.5 0 0 0 1.5 1.4h3.8a1.5 1.5 0 0 0 1.5-1.4l.6-8.1M6.75 7v4.5M9.25 7v4.5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function ChevronDownIcon(props: IconProps) {
   return (
     <svg {...base} width={16} height={16} viewBox="0 0 16 16" {...props}>
