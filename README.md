@@ -123,6 +123,7 @@ The feed URL is `https://tasks.example.com/feed/<token>/juan/tasks/`. As is, it 
 | `subtasks=0` | Leaves sub-tasks out. |
 | `priority=1,2` | Only tasks with these priorities (1 is the highest, 4 is none). |
 | `format=html` | Formatted descriptions: bold, italic, links and lists. Only Google Calendar shows them; other calendar apps show the HTML tags. |
+| `applinks=text` | With `format=html`: links to apps such as Obsidian show their address as text. Google Calendar removes these links, so otherwise the address is lost. |
 | `duration=30` | Timed tasks last this many minutes instead of being a point in time. |
 
 For example: `https://tasks.example.com/feed/<token>/juan/tasks/?tasks=1&completed=0&format=html`.

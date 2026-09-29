@@ -20,6 +20,8 @@ interface FeedOptions {
   subtasks: boolean;
   priorities: Priority[];
   html: boolean;
+  /** With html: app links (obsidian://) as text and address, since Google Calendar drops them. */
+  appLinksAsText: boolean;
   /** Minutes a timed task lasts; 0 is an instant. */
   duration: number;
 }
@@ -27,7 +29,7 @@ interface FeedOptions {
 const OPTIONS_KEY = 'tododav.feedOptions';
 
 // Tasks as events by default: the modal shares task lists, and Google Calendar shows nothing of them otherwise.
-const DEFAULT_OPTIONS: FeedOptions = { tasks: true, completed: true, subtasks: true, priorities: ALL_PRIORITIES, html: false, duration: 0 };
+const DEFAULT_OPTIONS: FeedOptions = { tasks: true, completed: true, subtasks: true, priorities: ALL_PRIORITIES, html: false, appLinksAsText: false, duration: 0 };
 
 const DURATIONS = [
   { value: '0', label: 'No duration' },
@@ -53,6 +55,7 @@ function loadOptions(): FeedOptions {
     subtasks: bool(saved.subtasks, DEFAULT_OPTIONS.subtasks),
     priorities: priorities.length > 0 ? priorities : DEFAULT_OPTIONS.priorities,
     html: bool(saved.html, DEFAULT_OPTIONS.html),
+    appLinksAsText: bool(saved.appLinksAsText, DEFAULT_OPTIONS.appLinksAsText),
     duration: DURATIONS.some((d) => Number(d.value) === saved.duration) ? (saved.duration as number) : DEFAULT_OPTIONS.duration,
   };
 }
@@ -67,6 +70,8 @@ function feedUrl(client: CalDavClient, calendar: Calendar, token: string, option
   if (!options.subtasks) params.push('subtasks=0');
   if (options.priorities.length < ALL_PRIORITIES.length) params.push(`priority=${options.priorities.join(',')}`);
   if (options.html) params.push('format=html');
+  // Remembered while the HTML is off, but only part of the link with it.
+  if (options.html && options.appLinksAsText) params.push('applinks=text');
   if (options.duration > 0) params.push(`duration=${options.duration}`);
   return `${url}?${params.join('&')}`;
 }
@@ -177,6 +182,25 @@ export function ShareModal({ client, calendar, token, onClose }: Props) {
                   </label>
                 </div>
                 <p className="muted">Bold, italic, links and lists. Google Calendar only: other apps show the HTML tags.</p>
+                {options.html && (
+                  <div className="share-task-options">
+                    <div className="settings-row">
+                      <label className="switch settings-switch">
+                        <input
+                          type="checkbox"
+                          checked={options.appLinksAsText}
+                          onChange={(e) => update({ appLinksAsText: e.target.checked })}
+                        />
+                        <span className="switch-track" aria-hidden="true" />
+                        Show app link addresses
+                      </label>
+                    </div>
+                    <p className="muted">
+                      Google Calendar removes links to apps such as Obsidian. This writes their address as text, so it
+                      can be copied.
+                    </p>
+                  </div>
+                )}
                 <div className="settings-row">
                   <span className="settings-label">Timed tasks last</span>
                   <Select

@@ -33,7 +33,7 @@ export function feed(config: Config): Router {
   return router;
 }
 
-const DEFAULT_OPTIONS: TaskOptions = { completed: true, subtasks: true, priorities: [1, 2, 3, 4], html: false, duration: 0 };
+const DEFAULT_OPTIONS: TaskOptions = { completed: true, subtasks: true, priorities: [1, 2, 3, 4], html: false, appLinksAsText: false, duration: 0 };
 
 /**
  * `undefined` without tasks=1: the other options only shape tasks, so they mean nothing on the stored calendar.
@@ -57,6 +57,13 @@ export function parseOptions(query: URLSearchParams): TaskOptions | undefined {
   if (format !== null) {
     if (format !== 'text' && format !== 'html') throw new Error('format must be text or html');
     options.html = format === 'html';
+  }
+
+  // Only shapes the HTML: the text form already writes every link's address.
+  const appLinks = query.get('applinks');
+  if (appLinks !== null) {
+    if (appLinks !== 'link' && appLinks !== 'text') throw new Error('applinks must be link or text');
+    options.appLinksAsText = appLinks === 'text';
   }
 
   const duration = query.get('duration');

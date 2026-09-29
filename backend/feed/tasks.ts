@@ -31,6 +31,8 @@ export interface TaskOptions {
   priorities: number[];
   /** format=html: the description as the HTML Google Calendar renders, instead of plain text. */
   html: boolean;
+  /** applinks=text: with format=html, app links (obsidian://) written as text and address, which Google would drop. */
+  appLinksAsText: boolean;
   /** duration=30: timed tasks last this many minutes instead of being an instant. */
   duration: number;
 }
@@ -275,7 +277,7 @@ function toEvent(vtodo: ICAL.Component, options: TaskOptions): ICAL.Component | 
   event.addPropertyWithValue('summary', completed ? `✓ ${summary}` : summary);
   const description = String(vtodo.getFirstPropertyValue('description') ?? '');
   if (description.trim()) {
-    event.addPropertyWithValue('description', options.html ? markdownToHtml(description) : markdownToText(description));
+    event.addPropertyWithValue('description', options.html ? markdownToHtml(description, { appLinksAsText: options.appLinksAsText }) : markdownToText(description));
   }
 
   const startProperty = vtodo.getFirstProperty('dtstart');

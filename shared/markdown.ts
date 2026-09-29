@@ -269,7 +269,18 @@ const escapeHtml = (text: string) =>
 
 const lines = (html: string) => html.replace(/\n/g, '<br>');
 
-function inlineHtml(nodes: Inline[]): string {
+export interface HtmlOptions {
+  /**
+   * App links (obsidian://) as their text plus the address, with no <a>. Google Calendar drops links whose
+   * scheme it doesn't trust, so the address would otherwise not show at all; as text it can at least be copied.
+   */
+  appLinksAsText?: boolean;
+}
+
+/** A link that hands over to an app rather than a web page or mail, which Google Calendar won't link. */
+const isAppHref = (href: string) => !/^(?:https?:\/\/|mailto:)/i.test(href);
+
+function inlineHtml(nodes: Inline[], options: HtmlOptions): string {
   return nodes
     .map((node) => {
       switch (node.type) {
@@ -277,15 +288,18 @@ function inlineHtml(nodes: Inline[]): string {
         case 'code':
           return escapeHtml(node.text);
         case 'strong':
-          return `<b>${inlineHtml(node.children)}</b>`;
+          return `<b>${inlineHtml(node.children, options)}</b>`;
         case 'em':
-          return `<i>${inlineHtml(node.children)}</i>`;
+          return `<i>${inlineHtml(node.children, options)}</i>`;
         case 'del':
-          return `<s>${inlineHtml(node.children)}</s>`;
-        case 'link':
-          return isSafeHref(node.href)
-            ? `<a href="${escapeHtml(node.href)}">${inlineHtml(node.children)}</a>`
-            : inlineHtml(node.children);
+          return `<s>${inlineHtml(node.children, options)}</s>`;
+        case 'link': {
+          const children = inlineHtml(node.children, options);
+          if (!isSafeHref(node.href)) return children;
+          if (!options.appLinksAsText || !isAppHref(node.href)) return `<a href="${escapeHtml(node.href)}">${children}</a>`;
+          // A bare address is already its own text.
+          return inlineText(node.children, false) === node.href ? children : `${children} (${escapeHtml(node.href)})`;
+        }
       }
     })
     .join('');
@@ -296,21 +310,21 @@ function inlineHtml(nodes: Inline[]): string {
  * writes: bold, italic, links, lists, line breaks). Anything else falls back to how markdownToText writes it.
  * Everything from the task is escaped, so it can only add these tags.
  */
-export function markdownToHtml(markdown: string): string {
-  return blocksHtml(parseMarkdown(markdown)).join('<br><br>');
+export function markdownToHtml(markdown: string, options: HtmlOptions = {}): string {
+  return blocksHtml(parseMarkdown(markdown), options).join('<br><br>');
 }
 
-function blocksHtml(blocks: Block[]): string[] {
+function blocksHtml(blocks: Block[], options: HtmlOptions): string[] {
   return blocks.map((block) => {
     switch (block.type) {
       case 'paragraph':
-        return lines(inlineHtml(parseInline(block.text)));
+        return lines(inlineHtml(parseInline(block.text), options));
       case 'heading':
-        return `<b>${inlineHtml(parseInline(block.text))}</b>`;
+        return `<b>${inlineHtml(parseInline(block.text), options)}</b>`;
       case 'list': {
         const tag = block.ordered ? 'ol' : 'ul';
         const start = block.ordered && block.start !== 1 ? ` start="${block.start}"` : '';
-        const items = block.items.map((item) => `<li>${blocksHtml(item).join('<br>')}</li>`).join('');
+        const items = block.items.map((item) => `<li>${blocksHtml(item, options).join('<br>')}</li>`).join('');
         return `<${tag}${start}>${items}</${tag}>`;
       }
       case 'code':
