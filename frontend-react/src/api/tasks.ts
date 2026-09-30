@@ -232,11 +232,19 @@ export function newUid(): string {
 export interface NewTaskOptions {
   /** Makes it a sub-task of this task. */
   parentUid?: string;
+  /** A UID that stays the same from one import to the next, so importing twice adds nothing. Random otherwise. */
+  uid?: string;
+  /** When the task was created, if earlier than now (an imported task). */
+  created?: Date;
+  /** Stores the task as completed at this time. */
+  completedAt?: Date;
 }
 
-/** iCalendar text for a brand-new open task, and the UID it was given. */
-export function newTaskIcs(edits: TaskEdits, { parentUid }: NewTaskOptions = {}): { uid: string; ics: string } {
-  const uid = newUid();
+/** iCalendar text for a brand-new task (open unless `completedAt` says otherwise), and the UID it was given. */
+export function newTaskIcs(
+  edits: TaskEdits,
+  { parentUid, uid = newUid(), created, completedAt }: NewTaskOptions = {},
+): { uid: string; ics: string } {
   const vcalendar = new ICAL.Component('vcalendar');
   vcalendar.updatePropertyWithValue('version', '2.0');
   vcalendar.updatePropertyWithValue('prodid', '-//ToDoDAV//EN');
@@ -245,9 +253,13 @@ export function newTaskIcs(edits: TaskEdits, { parentUid }: NewTaskOptions = {})
   vcalendar.addSubcomponent(vtodo);
   vtodo.updatePropertyWithValue('uid', uid);
   vtodo.updatePropertyWithValue('dtstamp', nowUtc());
-  vtodo.updatePropertyWithValue('created', nowUtc());
+  vtodo.updatePropertyWithValue('created', created ? ICAL.Time.fromJSDate(created, true) : nowUtc());
   vtodo.updatePropertyWithValue('last-modified', nowUtc());
-  vtodo.updatePropertyWithValue('status', 'NEEDS-ACTION');
+  if (completedAt) {
+    vtodo.updatePropertyWithValue('status', 'COMPLETED');
+    vtodo.updatePropertyWithValue('completed', ICAL.Time.fromJSDate(completedAt, true));
+    vtodo.updatePropertyWithValue('percent-complete', 100);
+  } else vtodo.updatePropertyWithValue('status', 'NEEDS-ACTION');
   if (parentUid) {
     // PARENT is the default, but spelling it out is what Thunderbird and Tasks.org write too.
     const relatedTo = new ICAL.Property('related-to');

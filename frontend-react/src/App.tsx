@@ -80,5 +80,12 @@ export function App() {
       />
     );
   }
-  return <MainPage session={session} openUid={route.name === 'tasks' ? route.uid : undefined} onLogout={logOut} />;
+  return (
+    <MainPage
+      session={session}
+      openUid={route.name === 'tasks' ? route.uid : undefined}
+      onLogout={logOut}
+      onCalendarsChange={(calendars) => setSession((current) => current && { ...current, calendars })}
+    />
+  );
 }

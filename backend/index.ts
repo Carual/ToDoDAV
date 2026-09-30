@@ -18,7 +18,17 @@ app.disable('x-powered-by');
 if (config.production) app.set('trust proxy', 'loopback, linklocal, uniquelocal');
 
 // The task modal can show a task's location in a Google Maps iframe; nothing else may be framed.
-app.use(helmet({ contentSecurityPolicy: { directives: { frameSrc: ["'self'", 'https://www.google.com'] } } }));
+// The Todoist import calls Todoist's API from the browser, so the user's Todoist token never reaches this server.
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        frameSrc: ["'self'", 'https://www.google.com'],
+        connectSrc: ["'self'", 'https://api.todoist.com'],
+      },
+    },
+  }),
+);
 
 // Status check: works over plain HTTP too, so a fresh install can be checked from anywhere. Reveals nothing else.
 app.get('/api/status', (_req, res) => {

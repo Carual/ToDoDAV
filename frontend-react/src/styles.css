@@ -2207,6 +2207,42 @@ button {
   overflow: auto;
 }
 
+/* ---------- Todoist import ---------- */
+
+.todoist-token {
+  margin: 8px 0;
+}
+
+.todoist-shortcuts {
+  margin: 0 0 8px;
+}
+
+/* An account can have dozens of projects: they scroll inside the section. */
+.todoist-projects {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.todoist-project {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.todoist-project-name {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.todoist-project-count {
+  font-size: 12px;
+}
+
+.transfer-progress .btn {
+  margin-left: auto;
+}
+
 .priority-toggles {
   display: flex;
   gap: 4px;

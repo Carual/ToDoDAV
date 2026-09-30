@@ -124,9 +124,11 @@ interface Props {
   /** UID of the task whose modal is open, from the URL (/tasks/<uid>). */
   openUid?: string;
   onLogout: () => void;
+  /** Lists were added on the server (an import can create them). */
+  onCalendarsChange: (calendars: Calendar[]) => void;
 }
 
-export function MainPage({ session, openUid, onLogout }: Props) {
+export function MainPage({ session, openUid, onLogout, onCalendarsChange }: Props) {
   const { client, calendars, config } = session;
   const canShare = config.feed !== undefined;
   // "All" only makes sense with several lists, and is where the app starts then, like Todoist's all-projects views.
@@ -568,11 +570,12 @@ export function MainPage({ session, openUid, onLogout }: Props) {
           calendars={calendars}
           calendarHref={newTaskCalendar.href}
           compare={view.compare}
-          onImported={(href) => {
-            list.refresh(href);
-            // The "All" view already shows the list imported into.
-            if (!allView) selectCalendar(href);
+          onImported={(hrefs) => {
+            for (const href of hrefs) list.refresh(href);
+            // The "All" view already shows the lists imported into; several lists are best seen there too.
+            if (!allView) selectCalendar(hrefs.length === 1 ? hrefs[0]! : ALL);
           }}
+          onListsCreated={(created) => onCalendarsChange([...calendars, ...created])}
           onClose={() => setTransferring(false)}
         />
       )}

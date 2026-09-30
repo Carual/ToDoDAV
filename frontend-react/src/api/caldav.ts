@@ -1,4 +1,4 @@
-import { parseTask, type Task } from './tasks.ts';
+import { newUid, parseTask, type Task } from './tasks.ts';
 
 export interface Credentials {
   username: string;
@@ -78,6 +78,8 @@ export class CalDavClient {
   private readonly origin: string;
   /** Path of the CalDAV root on the server. Hrefs in responses start with it; /proxy/ maps onto it. */
   private basePath = '/';
+  /** The user's calendar home (from discoverCalendars), where new lists are created. */
+  private home: string | undefined;
 
   /** `origin` is only needed outside the browser; in the app requests are same-origin. */
   constructor(credentials: Credentials, origin = '') {
@@ -98,6 +100,7 @@ export class CalDavClient {
 
     const [principalResponse] = await this.propfind(principal, 0, '<c:calendar-home-set/>');
     const home = (principalResponse && hrefInside(prop(principalResponse, CALDAV, 'calendar-home-set'))) ?? principal;
+    this.home = home.endsWith('/') ? home : `${home}/`;
 
     const responses = await this.propfind(
       home,
@@ -109,6 +112,26 @@ export class CalDavClient {
       name: prop(response, DAV, 'displayname')?.textContent?.trim() || lastSegment(response.href),
       color: prop(response, APPLE, 'calendar-color')?.textContent?.trim().slice(0, 7) || undefined,
     }));
+  }
+
+  /**
+   * Creates a new task list in the calendar home (MKCALENDAR), limited to tasks so calendar apps don't offer it
+   * for events. Its path is random: display names are free text, and a path can't be renamed later.
+   */
+  async createCalendar(name: string, color?: string): Promise<Calendar> {
+    if (!this.home) throw new CalDavError(0, 'The task lists have not been loaded yet.');
+    const href = `${this.home}${newUid()}/`;
+    await this.send('MKCALENDAR', href, {
+      headers: { 'Content-Type': XML },
+      body:
+        '<?xml version="1.0" encoding="utf-8"?>' +
+        `<c:mkcalendar xmlns:d="${DAV}" xmlns:c="${CALDAV}" xmlns:a="${APPLE}"><d:set><d:prop>` +
+        `<d:displayname>${escapeXml(name)}</d:displayname>` +
+        (color ? `<a:calendar-color>${escapeXml(color)}</a:calendar-color>` : '') +
+        '<c:supported-calendar-component-set><c:comp name="VTODO"/></c:supported-calendar-component-set>' +
+        '</d:prop></d:set></c:mkcalendar>',
+    });
+    return { href, name, color };
   }
 
   /** All tasks (open and completed) of one list. */
@@ -243,6 +266,9 @@ function isTaskList(response: DavResponse): boolean {
     (comp) => comp.getAttribute('name')?.toUpperCase() === 'VTODO',
   );
 }
+
+const escapeXml = (text: string) =>
+  text.replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;' })[c]!);
 
 function lastSegment(href: string): string {
   const segment = href.replace(/\/$/, '').split('/').pop() ?? href;

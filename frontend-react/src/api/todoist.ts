@@ -3,7 +3,7 @@ import { buildTree } from '../taskTree.ts';
 import { parseCsv, toCsv } from './csv.ts';
 import type { ImportItem, ParsedImport } from './icsFile.ts';
 import { newTaskIcs, type LocalDate, type Priority, type Task, type TaskEdits } from './tasks.ts';
-import { addMinutes, formatTodoistDate, parseTodoistDate } from './todoistDates.ts';
+import { addMinutes, formatTodoistDate, parseTodoistDate, type TodoistDate } from './todoistDates.ts';
 
 // Todoist's CSV format: https://www.todoist.com/help/articles/import-or-export-a-project-as-a-csv-file-in-todoist-YC8YvN
 const COLUMNS = [
@@ -126,6 +126,31 @@ interface Draft {
 const PRIORITIES: readonly Priority[] = [1, 2, 3, 4];
 
 /**
+ * Puts Todoist's date, duration (in minutes) and deadline (yyyy-mm-dd) on a task. A task here has a start and one
+ * due date: a duration becomes a start and a due time, both timed as iCalendar requires, and the deadline takes
+ * the due date only when Todoist had no date. Returns the deadline when it has to go in the description instead.
+ */
+export function setSchedule(edits: TaskEdits, date: TodoistDate | undefined, minutes: number, deadline?: string) {
+  if (date) {
+    edits.recurrence = date.recurrence;
+    if (date.due.time && minutes > 0) {
+      edits.start = date.due;
+      edits.due = addMinutes(date.due, minutes);
+    } else edits.due = date.due;
+  }
+  if (!deadline) return undefined;
+  if (edits.due) return deadline;
+  edits.due = { date: deadline };
+  return undefined;
+}
+
+/** A Todoist comment on a task: `Location: ...` (as the CSV export writes it) sets the location, others join `extra`. */
+export function addComment(edits: TaskEdits, extra: string[], content: string) {
+  if (content.startsWith(LOCATION_NOTE) && !edits.location) edits.location = content.slice(LOCATION_NOTE.length).trim();
+  else extra.push(content);
+}
+
+/**
  * The tasks of a Todoist CSV (an export or Todoist's template). Columns are found by their header, since
  * older exports have fewer of them. Sub-tasks follow INDENT, comments (notes) join their task's description,
  * and a section becomes a label on the tasks under it.
@@ -158,10 +183,7 @@ export function todoistToTasks(text: string, now = new Date()): ParsedImport {
       continue;
     }
     if (type === 'note') {
-      if (!last || !content) continue;
-      if (content.startsWith(LOCATION_NOTE) && !last.edits.location) {
-        last.edits.location = content.slice(LOCATION_NOTE.length).trim();
-      } else last.extra.push(content);
+      if (last && content) addComment(last.edits, last.extra, content);
       continue;
     }
     // Also skips meta rows (view_style) and the blank rows between parts.
@@ -196,28 +218,19 @@ export function todoistToTasks(text: string, now = new Date()): ParsedImport {
       draft.extra.push(`Todoist date: ${dateText}`);
       unreadable++;
     }
-    if (date) {
-      draft.edits.recurrence = date.recurrence;
-      const duration = Number(get('DURATION'));
-      const unit = get('DURATION_UNIT').toLowerCase();
-      if (date.due.time && duration > 0 && (unit === '' || unit === 'minute')) {
-        // A duration becomes a start and a due time, both timed as iCalendar requires.
-        draft.edits.start = date.due;
-        draft.edits.due = addMinutes(date.due, duration);
-      } else draft.edits.due = date.due;
-    }
-
     const deadlineText = get('DEADLINE');
-    if (deadlineText) {
-      const deadline = parseTodoistDate(deadlineText, now);
-      const day = deadline && !deadline.recurrence ? deadline.due.date : undefined;
-      if (!day) unreadable++;
-      // A task here has one due date. The deadline takes it when Todoist had no date; otherwise it is kept as text.
-      if (day && !draft.edits.due) draft.edits.due = { date: day };
-      else {
-        draft.extra.push(`Deadline: ${day ?? deadlineText}`);
-        if (day) deadlinesKept++;
-      }
+    const deadline = deadlineText ? parseTodoistDate(deadlineText, now) : undefined;
+    const deadlineDay = deadline && !deadline.recurrence ? deadline.due.date : undefined;
+    if (deadlineText && !deadlineDay) {
+      draft.extra.push(`Deadline: ${deadlineText}`);
+      unreadable++;
+    }
+    const unit = get('DURATION_UNIT').toLowerCase();
+    const minutes = unit === '' || unit === 'minute' ? Number(get('DURATION')) : 0;
+    const keptDeadline = setSchedule(draft.edits, date, minutes, deadlineDay);
+    if (keptDeadline) {
+      draft.extra.push(`Deadline: ${keptDeadline}`);
+      deadlinesKept++;
     }
 
     const indent = Math.max(1, Math.trunc(Number(get('INDENT'))) || 1);

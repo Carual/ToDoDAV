@@ -25,6 +25,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - Edit title, description, start date, due date (all-day or with a time), priority and labels. Ctrl/⌘+Enter saves.
 - Markdown in titles and descriptions, as in Todoist: **bold**, *italic*, ~~strikethrough~~, `code` and links in both, plus headings, lists, quotes and code blocks in descriptions.
 - Import and export a list (Settings → Import or export), either as an iCalendar `.ics` file or as a Todoist CSV that Todoist can import (and read Todoist's CSV exports and template). Everything happens in your browser.
+- Move from Todoist in one go: paste your Todoist API token and choose where each project goes (an existing list or a new one), with sub-tasks at any depth, exact dates, repeats, labels, comments and, if you want, your completed tasks back to the day you joined. The token goes from your browser straight to Todoist, is never stored, and importing again only adds what is new.
 - An optional read-only calendar feed for Google Calendar, with a share button that builds the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
 
 ## How it works

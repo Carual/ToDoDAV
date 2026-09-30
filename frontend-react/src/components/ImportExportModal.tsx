@@ -1,6 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import type { Calendar, CalDavClient } from '../api/caldav.ts';
 import { icsToTasks, tasksToIcs, type ImportItem, type ParsedImport } from '../api/icsFile.ts';
+import { storeTasks } from '../api/importTasks.ts';
 import type { Task } from '../api/tasks.ts';
 import { tasksToTodoist, todoistToTasks } from '../api/todoist.ts';
 import { download, fileName } from '../download.ts';
@@ -8,14 +9,17 @@ import { readSetting, saveSetting } from '../viewSettings.ts';
 import { CloseIcon, HashIcon, TransferIcon } from './icons.tsx';
 import { Select, type SelectOption } from './Select.tsx';
 import { Spinner } from './Spinner.tsx';
+import { TodoistImport } from './TodoistImport.tsx';
+import { Warnings } from './Warnings.tsx';
 
 const FORMAT_KEY = 'tododav.transferFormat';
 
-type Format = 'ics' | 'todoist';
+type Format = 'ics' | 'todoist' | 'todoist-api';
 
 const FORMATS: SelectOption<Format>[] = [
   { value: 'ics', label: 'iCalendar (.ics)' },
   { value: 'todoist', label: 'Todoist (CSV)' },
+  { value: 'todoist-api', label: 'Todoist (account)' },
 ];
 
 type ImportState =
@@ -38,31 +42,30 @@ interface Props {
   calendarHref: string;
   /** The list's order, so a Todoist export lists the tasks as they show here. */
   compare: (a: Task, b: Task) => number;
-  /** Tasks were written to this list behind the app's back: it has to be fetched again. */
-  onImported: (calendarHref: string) => void;
+  /** Tasks were written to these lists behind the app's back: they have to be fetched again. */
+  onImported: (calendarHrefs: string[]) => void;
+  /** New lists were created on the server (the Todoist import can make one per project). */
+  onListsCreated: (created: Calendar[]) => void;
   onClose: () => void;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : 'Something went wrong.');
 
-/** Runs `run` on every item, at most `limit` at a time, so a big import doesn't flood the server. */
-async function eachLimited<T>(items: T[], limit: number, run: (item: T) => Promise<void>) {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) await run(items[next++]!);
-  };
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+function savedFormat(): Format {
+  const saved = readSetting(FORMAT_KEY);
+  return FORMATS.find((f) => f.value === saved)?.value ?? 'ics';
 }
 
-export function ImportExportModal({ client, calendars, calendarHref, compare, onImported, onClose }: Props) {
-  const [format, setFormatState] = useState<Format>(() => (readSetting(FORMAT_KEY) === 'todoist' ? 'todoist' : 'ics'));
+export function ImportExportModal({ client, calendars, calendarHref, compare, onImported, onListsCreated, onClose }: Props) {
+  const [format, setFormatState] = useState<Format>(savedFormat);
   const [href, setHref] = useState(calendarHref);
   const [includeCompleted, setIncludeCompleted] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<ExportResult | null>(null);
   const [importState, setImportState] = useState<ImportState>({ step: 'idle' });
-  const importing = importState.step === 'importing';
+  const [accountImporting, setAccountImporting] = useState(false);
+  const importing = importState.step === 'importing' || accountImporting;
   const busy = exporting || importing;
   const calendar = calendars.find((c) => c.href === href) ?? calendars[0]!;
 
@@ -128,31 +131,16 @@ export function ImportExportModal({ client, calendars, calendarHref, compare, on
   }
 
   async function runImport(items: ImportItem[]) {
-    const target = calendar.href;
     setImportState({ step: 'importing', done: 0, total: items.length });
-    let existing: Set<string>;
     try {
-      existing = new Set((await client.listTasks(target)).map((t) => t.uid));
+      const result = await storeTasks(client, [{ href: calendar.href, items }], (done, total) =>
+        setImportState({ step: 'importing', done, total }),
+      );
+      if (result.changed.length > 0) onImported(result.changed);
+      setImportState({ step: 'done', ...result });
     } catch (error) {
       setImportState({ step: 'error', message: messageOf(error) });
-      return;
     }
-    // A task already in the list (same UID) is left alone: importing the same file twice adds nothing.
-    const todo = items.filter((item) => !existing.has(item.uid));
-    const failures: string[] = [];
-    let done = 0;
-    setImportState({ step: 'importing', done, total: todo.length });
-    await eachLimited(todo, 4, async (item) => {
-      try {
-        await client.createTask(client.taskHref(target, item.uid), item.ics);
-      } catch (error) {
-        failures.push(`${item.summary || 'Untitled task'}: ${messageOf(error)}`);
-      }
-      done++;
-      setImportState({ step: 'importing', done, total: todo.length });
-    });
-    if (failures.length < todo.length) onImported(target);
-    setImportState({ step: 'done', imported: todo.length - failures.length, skipped: items.length - todo.length, failures });
   }
 
   return (
@@ -181,7 +169,7 @@ export function ImportExportModal({ client, calendars, calendarHref, compare, on
                 options={FORMATS}
               />
             </div>
-            {calendars.length > 1 && (
+            {calendars.length > 1 && format !== 'todoist-api' && (
               <div className="settings-row">
                 <span className="settings-label">Task list</span>
                 <Select
@@ -200,67 +188,80 @@ export function ImportExportModal({ client, calendars, calendarHref, compare, on
             )}
           </section>
 
-          <section className="settings-section">
-            <h2>Export</h2>
-            {format === 'ics' ? (
-              <p className="muted">
-                Downloads every task of <strong>{calendar.name}</strong> as one .ics file, with everything other apps
-                stored in them (reminders, repeats...). Most task apps can import it.
-              </p>
-            ) : (
-              <p className="muted">
-                Downloads the open tasks of <strong>{calendar.name}</strong> in Todoist's CSV format, with sub-tasks,
-                priorities, labels, dates and repeats; the location and link go in a comment. Completed tasks are left
-                out, as in Todoist's own export. In Todoist, open a project's <strong>⋯ menu → Import from CSV</strong>.
-              </p>
-            )}
-            {format === 'ics' && (
-              <div className="settings-row">
-                <label className="switch settings-switch">
-                  <input
-                    type="checkbox"
-                    checked={includeCompleted}
-                    onChange={(e) => setIncludeCompleted(e.target.checked)}
-                  />
-                  <span className="switch-track" aria-hidden="true" />
-                  Include completed tasks
-                </label>
-              </div>
-            )}
-            <div className="transfer-actions">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                disabled={busy}
-                aria-busy={exporting}
-                onClick={() => void runExport()}
-              >
-                {exporting ? <Spinner label="Exporting" /> : 'Export'}
-              </button>
-              {exportResult && (
-                <span className={exportResult.error ? 'form-error transfer-status' : 'transfer-status'} role="status">
-                  {exportResult.message}
-                </span>
-              )}
-            </div>
-            <Warnings warnings={exportResult?.warnings ?? []} />
-          </section>
+          {format === 'todoist-api' ? (
+            <TodoistImport
+              client={client}
+              calendars={calendars}
+              calendarHref={calendarHref}
+              onBusyChange={setAccountImporting}
+              onImported={onImported}
+              onListsCreated={onListsCreated}
+            />
+          ) : (
+            <>
+              <section className="settings-section">
+                <h2>Export</h2>
+                {format === 'ics' ? (
+                  <p className="muted">
+                    Downloads every task of <strong>{calendar.name}</strong> as one .ics file, with everything other apps
+                    stored in them (reminders, repeats...). Most task apps can import it.
+                  </p>
+                ) : (
+                  <p className="muted">
+                    Downloads the open tasks of <strong>{calendar.name}</strong> in Todoist's CSV format, with sub-tasks,
+                    priorities, labels, dates and repeats; the location and link go in a comment. Completed tasks are left
+                    out, as in Todoist's own export. In Todoist, open a project's <strong>⋯ menu → Import from CSV</strong>.
+                  </p>
+                )}
+                {format === 'ics' && (
+                  <div className="settings-row">
+                    <label className="switch settings-switch">
+                      <input
+                        type="checkbox"
+                        checked={includeCompleted}
+                        onChange={(e) => setIncludeCompleted(e.target.checked)}
+                      />
+                      <span className="switch-track" aria-hidden="true" />
+                      Include completed tasks
+                    </label>
+                  </div>
+                )}
+                <div className="transfer-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    disabled={busy}
+                    aria-busy={exporting}
+                    onClick={() => void runExport()}
+                  >
+                    {exporting ? <Spinner label="Exporting" /> : 'Export'}
+                  </button>
+                  {exportResult && (
+                    <span className={exportResult.error ? 'form-error transfer-status' : 'transfer-status'} role="status">
+                      {exportResult.message}
+                    </span>
+                  )}
+                </div>
+                <Warnings warnings={exportResult?.warnings ?? []} />
+              </section>
 
-          <section className="settings-section">
-            <h2>Import</h2>
-            {format === 'ics' ? (
-              <p className="muted">
-                Adds the tasks of an .ics file to <strong>{calendar.name}</strong>. Tasks already in it are skipped, so
-                importing the same file twice adds nothing.
-              </p>
-            ) : (
-              <p className="muted">
-                Adds the tasks of a Todoist CSV export (or Todoist's template) to <strong>{calendar.name}</strong>.
-                Comments go into the description, and section names become labels.
-              </p>
-            )}
-            <ImportStep state={importState} onChoose={chooseFile} onImport={runImport} format={format} busy={busy} />
-          </section>
+              <section className="settings-section">
+                <h2>Import</h2>
+                {format === 'ics' ? (
+                  <p className="muted">
+                    Adds the tasks of an .ics file to <strong>{calendar.name}</strong>. Tasks already in it are skipped, so
+                    importing the same file twice adds nothing.
+                  </p>
+                ) : (
+                  <p className="muted">
+                    Adds the tasks of a Todoist CSV export (or Todoist's template) to <strong>{calendar.name}</strong>.
+                    Comments go into the description, and section names become labels.
+                  </p>
+                )}
+                <ImportStep state={importState} onChoose={chooseFile} onImport={runImport} format={format} busy={busy} />
+              </section>
+            </>
+          )}
         </div>
 
         <footer className="modal-footer">
@@ -351,15 +352,4 @@ function ImportStep({ state, format, busy, onChoose, onImport }: ImportStepProps
         </>
       );
   }
-}
-
-function Warnings({ warnings }: { warnings: string[] }) {
-  if (warnings.length === 0) return null;
-  return (
-    <ul className="transfer-warnings">
-      {warnings.map((warning) => (
-        <li key={warning}>{warning}</li>
-      ))}
-    </ul>
-  );
 }
