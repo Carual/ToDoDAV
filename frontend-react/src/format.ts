@@ -37,6 +37,22 @@ export function describeDue(due: LocalDate, now = new Date()): { label: string; 
   return { label: label + time, tone };
 }
 
+/** A journal day heading: "Today", "Yesterday", "Tomorrow", else "Sunday, 28 Sep" (with the year if not this one). */
+export function describeDay(date: string, now = new Date()): string {
+  const day = new Date(`${date}T00:00`);
+  const days = Math.round((day.getTime() - startOfDay(now).getTime()) / DAY_MS);
+  if (days === 0) return 'Today';
+  if (days === -1) return 'Yesterday';
+  if (days === 1) return 'Tomorrow';
+  const sameYear = day.getFullYear() === now.getFullYear();
+  return day.toLocaleDateString(undefined, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: sameYear ? undefined : 'numeric',
+  });
+}
+
 export function formatDateTime(date: Date): string {
   return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }

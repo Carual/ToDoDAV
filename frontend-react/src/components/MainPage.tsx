@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Calendar } from '../api/caldav.ts';
 import type { Task, TaskEdits } from '../api/tasks.ts';
 import { describeDue } from '../format.ts';
@@ -19,7 +19,7 @@ import {
 } from '../viewSettings.ts';
 import { FilterModal } from './FilterModal.tsx';
 import { ImportExportModal } from './ImportExportModal.tsx';
-import { ChevronDownIcon, FilterIcon, GearIcon, HashIcon, LayersIcon, LogoMark, PlusIcon, ShareIcon } from './icons.tsx';
+import { ChevronDownIcon, FilterIcon, HashIcon, LayersIcon, PlusIcon, ShareIcon } from './icons.tsx';
 import type { Session } from './Login.tsx';
 import { Select } from './Select.tsx';
 import { SettingsModal } from './SettingsModal.tsx';
@@ -27,17 +27,13 @@ import { ShareModal } from './ShareModal.tsx';
 import { Spinner } from './Spinner.tsx';
 import { TaskItem } from './TaskItem.tsx';
 import { TaskModal } from './TaskModal.tsx';
+import { useToast } from './Toast.tsx';
+import { TopBar } from './TopBar.tsx';
 
 const SELECTED_KEY = 'tododav.calendar';
 /** The "All" view's value where a list href would go; hrefs start with / or a scheme, so it can't clash. */
 const ALL = 'all';
 const SHOW_COMPLETED_KEY = 'tododav.showCompleted';
-
-interface Toast {
-  message: string;
-  /** A button in the toast, such as Undo or Retry. */
-  action?: { label: string; run: () => void };
-}
 
 type Compare = (a: Task, b: Task) => number;
 
@@ -159,14 +155,8 @@ export function MainPage({ session, openUid, onLogout, onCalendarsChange }: Prop
 
   const changeFilters = (filters: Filters) => changeSettings({ ...settings, filters });
 
-  const [toast, setToast] = useState<Toast | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  function showToast(next: Toast) {
-    clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), 5000);
-  }
+  const toast = useToast();
+  const showToast = toast.show;
 
   // Every change shows at once; a failed save puts the task back and says so here.
   const list = useTaskList({
@@ -329,30 +319,7 @@ export function MainPage({ session, openUid, onLogout, onCalendarsChange }: Prop
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="brand brand-small">
-          <LogoMark className="brand-mark" />
-          ToDoDAV
-        </div>
-        <div className="account">
-          <button
-            type="button"
-            className="icon-btn"
-            aria-label="Settings"
-            title="Settings"
-            onClick={() => setEditingSettings(true)}
-          >
-            <GearIcon />
-          </button>
-          <span className="avatar" aria-hidden="true">
-            {client.username.slice(0, 1).toUpperCase()}
-          </span>
-          <span className="account-name">{client.username}</span>
-          <button type="button" className="btn btn-link" onClick={onLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+      <TopBar section="tasks" username={client.username} onSettings={() => setEditingSettings(true)} onLogout={onLogout} />
 
       <main className="content">
         {!hasLists ? (
@@ -589,23 +556,7 @@ export function MainPage({ session, openUid, onLogout, onCalendarsChange }: Prop
         />
       )}
 
-      {toast && (
-        <div className="toast" role="status">
-          <span>{toast.message}</span>
-          {toast.action && (
-            <button
-              type="button"
-              className="toast-action"
-              onClick={() => {
-                toast.action?.run();
-                setToast(null);
-              }}
-            >
-              {toast.action.label}
-            </button>
-          )}
-        </div>
-      )}
+      {toast.element}
     </div>
   );
 }

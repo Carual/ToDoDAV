@@ -697,6 +697,39 @@ button {
   border-bottom: 1px solid var(--divider);
 }
 
+.topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Tasks | Journal: plain tabs, the current one underlined in the accent color. */
+.nav-tabs {
+  display: flex;
+  align-self: stretch;
+  gap: 4px;
+}
+
+.nav-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.nav-tab:hover {
+  color: var(--text);
+}
+
+.nav-tab[aria-current='page'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
 .account {
   display: flex;
   align-items: center;
@@ -1176,6 +1209,61 @@ button {
 
 .task-done .due {
   color: var(--text-tertiary);
+}
+
+/* ---------- Journal ---------- */
+
+.journal-day {
+  margin-top: 20px;
+}
+
+.journal-day-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 600;
+}
+
+.journal-day-count {
+  font-weight: 400;
+  color: var(--text-tertiary);
+}
+
+/* The time sits where a task's checkbox would, in a fixed column so the titles line up. */
+.journal-time {
+  flex-shrink: 0;
+  width: 64px;
+  font-size: 12px;
+  line-height: 21px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--bg-soft);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--text-secondary);
+  vertical-align: 1px;
+}
+
+.journal-cancelled .task-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+/* Room to write: the text starts at a few lines rather than one. */
+.journal-modal .modal-description {
+  min-height: 140px;
 }
 
 /* ---------- Task modal ---------- */
@@ -2003,7 +2091,7 @@ button {
   font-size: 12px;
 }
 
-/* The task options belong to "Show tasks as events", so they sit under it. */
+/* Options that belong to a switch ("Show tasks as events", "Formatted descriptions") sit under it. */
 .share-task-options {
   margin-top: 4px;
   padding-left: 12px;
@@ -2359,6 +2447,19 @@ button {
 
   .account-name {
     display: none;
+  }
+
+  /* The tabs need the room more than the name does; the logo stays. */
+  .brand-name {
+    display: none;
+  }
+
+  .topbar-start {
+    gap: 8px;
+  }
+
+  .journal-time {
+    width: 52px;
   }
 
   .modal-backdrop {

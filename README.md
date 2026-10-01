@@ -26,6 +26,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - Markdown in titles and descriptions, as in Todoist: **bold**, *italic*, ~~strikethrough~~, `code` and links in both, plus headings, lists, quotes and code blocks in descriptions.
 - Import and export a list (Settings → Import or export), either as an iCalendar `.ics` file or as a Todoist CSV that Todoist can import (and read Todoist's CSV exports and template). Everything happens in your browser.
 - Move from Todoist in one go: paste your Todoist API token and choose where each project goes (an existing list or a new one), with sub-tasks at any depth, exact dates, repeats, labels, comments and, if you want, your completed tasks back to the day you joined. The token goes from your browser straight to Todoist, is never stored, and importing again only adds what is new.
+- A Journal page (the tab next to the logo) for journal entries (`VJOURNAL`), such as jtx Board writes: entries by day, newest first, and undated notes in their own section. Write and edit them with Markdown, a date (all-day or timed), a status (draft, final, cancelled), labels and location; delete them with Undo. Its share button adds a journal to Google Calendar, with the entries as events. If none of your calendars takes journal entries, the page can create one.
 - An optional read-only calendar feed for Google Calendar, with a share button that builds the link to copy (see [Calendar feeds](#calendar-feeds-google-calendar)).
 
 ## How it works
@@ -119,13 +120,16 @@ The feed URL is `https://tasks.example.com/feed/<token>/juan/tasks/`. As is, it 
 
 | Parameter | What it does |
 | --- | --- |
-| `tasks=1` | Shows each task with a due date as an event on that date. The calendar's own events stay as they are. The options below only work with this one. |
-| `completed=0` | Leaves completed tasks out. |
-| `subtasks=0` | Leaves sub-tasks out. |
-| `priority=1,2` | Only tasks with these priorities (1 is the highest, 4 is none). |
+| `tasks=1` | Shows each task with a due date as an event on that date. The calendar's own events stay as they are. |
+| `journals=1` | Shows each journal entry with a date (`VJOURNAL`, as jtx Board writes them) as an event on that date. Works with or without `tasks=1`. |
+| `completed=0` | With `tasks=1`: leaves completed tasks out. |
+| `subtasks=0` | With `tasks=1`: leaves sub-tasks out. |
+| `priority=1,2` | With `tasks=1`: only tasks with these priorities (1 is the highest, 4 is none). |
 | `format=html` | Formatted descriptions: bold, italic, links and lists. Only Google Calendar shows them; other calendar apps show the HTML tags. |
 | `applinks=text` | With `format=html`: links to apps such as Obsidian show their address as text. Google Calendar removes these links, so otherwise the address is lost. |
-| `duration=30` | Timed tasks last this many minutes instead of being a point in time. |
+| `duration=30` | Timed tasks and journal entries last this many minutes instead of being a point in time. |
+
+Without `tasks=1` or `journals=1`, the other options are ignored.
 
 For example: `https://tasks.example.com/feed/<token>/juan/tasks/?tasks=1&completed=0&format=html`.
 
@@ -136,6 +140,7 @@ What to expect:
 - **Read-only and slow to update.** Google refreshes subscribed calendars on its own schedule, often every 8–24 hours. Completing a task in Google isn't possible.
 - **Changing the options makes a new URL**, which Google treats as a different calendar: subscribe to the new one and remove the old one.
 - **Tasks as events:** tasks without a due date and cancelled tasks are left out. Completed tasks stay with a ✓ (on their last date only, if they repeated). A task with a start date before its due date spans both. Repeating tasks repeat. Priority and labels aren't shown.
+- **Journal entries as events:** undated notes and cancelled entries are left out. Drafts are shown like final entries. Repeating entries repeat.
 
 ## Security
 

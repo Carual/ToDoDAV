@@ -1,17 +1,19 @@
 import express, { type Router } from 'express';
 import type { Config } from '../config.ts';
 import { storedCalendar } from './stored.ts';
-import { tasksAsEvents, type TaskOptions } from './tasks.ts';
+import { convertedCalendar } from './converted.ts';
+import type { EventOptions } from './event.ts';
 
 /**
  * /feed/<path>: one calendar for subscribers that cannot log in (the token is already checked and removed).
- * Without options it is the calendar as stored. With tasks=1 its tasks become events, and the rest of the
- * query shapes them (see parseOptions); a changed URL is a new calendar to the subscriber.
+ * Without options it is the calendar as stored. With tasks=1 its tasks become events, with journals=1 its journal
+ * entries do, and the rest of the query shapes them (see parseOptions); a changed URL is a new calendar to the
+ * subscriber.
  */
 export function feed(config: Config): Router {
   const router = express.Router();
   const stored = storedCalendar(config);
-  const converted = tasksAsEvents(config);
+  const converted = convertedCalendar(config);
 
   router.use((req, res, next) => {
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -19,7 +21,7 @@ export function feed(config: Config): Router {
       return;
     }
     const query = new URLSearchParams(req.originalUrl.split('?')[1] ?? '');
-    let options: TaskOptions | undefined;
+    let options: EventOptions | undefined;
     try {
       options = parseOptions(query);
     } catch (error) {
@@ -33,16 +35,19 @@ export function feed(config: Config): Router {
   return router;
 }
 
-const DEFAULT_OPTIONS: TaskOptions = { completed: true, subtasks: true, priorities: [1, 2, 3, 4], html: false, appLinksAsText: false, duration: 0 };
+const DEFAULT_OPTIONS: EventOptions = { tasks: false, journals: false, completed: true, subtasks: true, priorities: [1, 2, 3, 4], html: false, appLinksAsText: false, duration: 0 };
 
 /**
- * `undefined` without tasks=1: the other options only shape tasks, so they mean nothing on the stored calendar.
+ * `undefined` without tasks=1 or journals=1: the other options only shape what those turn into events, so they
+ * mean nothing on the stored calendar. completed, subtasks and priority apply to tasks only.
  * Unknown parameters are ignored (a subscriber may add its own); a known one with a bad value is refused, so a
  * mistyped URL fails where it is pasted instead of quietly showing something else.
  */
-export function parseOptions(query: URLSearchParams): TaskOptions | undefined {
-  if (!flag(query, 'tasks', false)) return undefined;
-  const options = { ...DEFAULT_OPTIONS };
+export function parseOptions(query: URLSearchParams): EventOptions | undefined {
+  const tasks = flag(query, 'tasks', false);
+  const journals = flag(query, 'journals', false);
+  if (!tasks && !journals) return undefined;
+  const options = { ...DEFAULT_OPTIONS, tasks, journals };
   options.completed = flag(query, 'completed', options.completed);
   options.subtasks = flag(query, 'subtasks', options.subtasks);
 

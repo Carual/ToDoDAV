@@ -55,7 +55,7 @@ export async function storeTasks(
   onProgress(done, todo.length);
   await eachLimited(todo, 4, async ({ href, item }) => {
     try {
-      await client.createTask(client.taskHref(href, item.uid), item.ics);
+      await client.createObject(client.objectHref(href, item.uid), item.ics);
       changed.add(href);
     } catch (error) {
       failures.push(`${item.summary || 'Untitled task'}: ${messageOf(error)}`);

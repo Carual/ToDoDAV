@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Credentials } from './api/caldav.ts';
 import { logIn, Login, type Session } from './components/Login.tsx';
 import { LogoMark } from './components/icons.tsx';
+import { JournalPage } from './components/JournalPage.tsx';
 import { MainPage } from './components/MainPage.tsx';
 import { Spinner } from './components/Spinner.tsx';
 import { navigate, parseRoute, usePath } from './router.ts';
@@ -32,20 +33,21 @@ export function App() {
   const [restoring, setRestoring] = useState(() => readCredentials() !== null);
   const path = usePath();
   const route = parseRoute(path);
-  // Where to go after logging in: a task link opened while logged out ends up on that task.
+  // Where to go after logging in: a task or entry link opened while logged out ends up on it.
   const afterLogin = useRef('/tasks');
+  const inApp = route.name === 'tasks' || route.name === 'journal';
 
-  // /login without a session, /tasks... with one. Replace, not push, so Back never lands on a redirect.
+  // /login without a session, /tasks... or /journal... with one. Replace, not push, so Back never lands on a redirect.
   useEffect(() => {
     if (restoring) return;
     if (!session && route.name !== 'login') {
-      if (route.name === 'tasks') afterLogin.current = path;
+      if (inApp) afterLogin.current = path;
       navigate('/login', { replace: true });
-    } else if (session && route.name !== 'tasks') {
+    } else if (session && !inApp) {
       navigate(afterLogin.current, { replace: true });
       afterLogin.current = '/tasks';
     }
-  }, [restoring, session, route.name, path]);
+  }, [restoring, session, route.name, inApp, path]);
 
   // After a reload, log in again silently with the credentials kept for this tab.
   useEffect(() => {
@@ -77,6 +79,16 @@ export function App() {
           writeCredentials(credentials);
           setSession(next);
         }}
+      />
+    );
+  }
+  if (route.name === 'journal') {
+    return (
+      <JournalPage
+        session={session}
+        openUid={route.uid}
+        onLogout={logOut}
+        onJournalsChange={(journals) => setSession((current) => current && { ...current, journals })}
       />
     );
   }

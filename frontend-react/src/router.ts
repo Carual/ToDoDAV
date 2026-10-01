@@ -4,7 +4,11 @@ import { useEffect, useSyncExternalStore } from 'react';
 // Deep links need the server to answer every app path with index.html (Vite does it in dev;
 // in production the reverse proxy must, see README).
 
-export type Route = { name: 'login' } | { name: 'tasks'; uid?: string } | { name: 'unknown' };
+export type Route =
+  | { name: 'login' }
+  | { name: 'tasks'; uid?: string }
+  | { name: 'journal'; uid?: string }
+  | { name: 'unknown' };
 
 /** pushState does not fire popstate, so the router announces every accepted change with this event. */
 const NAVIGATE_EVENT = 'tododav:navigate';
@@ -101,19 +105,23 @@ export function useLeaveGuard(active: boolean, ask: () => Promise<boolean>) {
 
 export function parseRoute(path: string): Route {
   if (/^\/login\/?$/.test(path)) return { name: 'login' };
-  if (/^\/tasks\/?$/.test(path)) return { name: 'tasks' };
-  const encodedUid = /^\/tasks\/([^/]+)\/?$/.exec(path)?.[1];
-  if (encodedUid) {
-    try {
-      return { name: 'tasks', uid: decodeURIComponent(encodedUid) };
-    } catch {
-      return { name: 'unknown' }; // malformed percent-encoding
-    }
+  const match = /^\/(tasks|journal)(?:\/([^/]+))?\/?$/.exec(path);
+  if (!match) return { name: 'unknown' };
+  const name = match[1] as 'tasks' | 'journal';
+  const encodedUid = match[2];
+  if (!encodedUid) return { name };
+  try {
+    return { name, uid: decodeURIComponent(encodedUid) };
+  } catch {
+    return { name: 'unknown' }; // malformed percent-encoding
   }
-  return { name: 'unknown' };
 }
 
 /** UIDs are free text (often `something@host`), so they are always encoded into the path. */
 export function taskPath(uid: string): string {
   return `/tasks/${encodeURIComponent(uid)}`;
+}
+
+export function journalPath(uid: string): string {
+  return `/journal/${encodeURIComponent(uid)}`;
 }

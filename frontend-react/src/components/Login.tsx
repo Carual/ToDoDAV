@@ -5,7 +5,10 @@ import { Spinner } from './Spinner.tsx';
 
 export interface Session {
   client: CalDavClient;
+  /** The task lists. */
   calendars: Calendar[];
+  /** The calendars that take journal entries (some are task lists too). */
+  journals: Calendar[];
   config: ServerConfig;
 }
 
@@ -14,8 +17,11 @@ export async function logIn(credentials: Credentials): Promise<Session> {
   const client = new CalDavClient(credentials);
   // The settings only add extras (feed links), so a backend or reverse proxy without /api/config
   // must not block the login.
-  const [calendars, config] = await Promise.all([client.discoverCalendars(), client.serverConfig().catch(() => NO_FEEDS)]);
-  return { client, calendars, config };
+  const [{ tasks, journals }, config] = await Promise.all([
+    client.discoverCalendars(),
+    client.serverConfig().catch(() => NO_FEEDS),
+  ]);
+  return { client, calendars: tasks, journals, config };
 }
 
 export function Login({ onLogin }: { onLogin: (session: Session, credentials: Credentials) => void }) {

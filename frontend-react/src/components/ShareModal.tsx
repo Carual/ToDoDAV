@@ -9,13 +9,18 @@ interface Props {
   client: CalDavClient;
   calendar: Calendar;
   token: string;
+  /** The page sharing it: each starts from what it shows, and remembers its own choices. */
+  section?: 'tasks' | 'journal';
   onClose: () => void;
 }
 
 /** What the feed's query string asks for (backend/feed/index.ts); the defaults add nothing to the URL. */
 interface FeedOptions {
-  /** tasks=1: tasks become events. Off, the calendar is sent as stored (and Google ignores its tasks). */
+  /** tasks=1: tasks become events. With journals off too, the calendar is sent as stored (and Google ignores its tasks). */
   tasks: boolean;
+  /** journals=1: journal entries with a date (VJOURNAL, as jtx Board writes them) become events. */
+  journals: boolean;
+  /** completed, subtasks and priorities only shape tasks. */
   completed: boolean;
   subtasks: boolean;
   priorities: Priority[];
@@ -26,10 +31,12 @@ interface FeedOptions {
   duration: number;
 }
 
-const OPTIONS_KEY = 'tododav.feedOptions';
+// Each page shares what it shows as events by default (Google Calendar shows nothing of tasks or journal
+// entries otherwise), and keeps its own choices, so sharing a journal doesn't change the next task list's link.
+const OPTIONS_KEYS = { tasks: 'tododav.feedOptions', journal: 'tododav.journalFeedOptions' } as const;
 
-// Tasks as events by default: the modal shares task lists, and Google Calendar shows nothing of them otherwise.
-const DEFAULT_OPTIONS: FeedOptions = { tasks: true, completed: true, subtasks: true, priorities: ALL_PRIORITIES, html: false, appLinksAsText: false, duration: 0 };
+const TASK_DEFAULTS: FeedOptions = { tasks: true, journals: false, completed: true, subtasks: true, priorities: ALL_PRIORITIES, html: false, appLinksAsText: false, duration: 0 };
+const DEFAULTS = { tasks: TASK_DEFAULTS, journal: { ...TASK_DEFAULTS, tasks: false, journals: true } } as const;
 
 const DURATIONS = [
   { value: '0', label: 'No duration' },
@@ -40,10 +47,11 @@ const DURATIONS = [
 ];
 
 /** The options last used, so the next list's link comes out the same; anything unreadable falls back to the default. */
-function loadOptions(): FeedOptions {
+function loadOptions(section: 'tasks' | 'journal'): FeedOptions {
+  const DEFAULT_OPTIONS = DEFAULTS[section];
   let saved: Partial<Record<keyof FeedOptions, unknown>> = {};
   try {
-    saved = JSON.parse(readSetting(OPTIONS_KEY) ?? '{}') ?? {};
+    saved = JSON.parse(readSetting(OPTIONS_KEYS[section]) ?? '{}') ?? {};
   } catch {
     // Keep the defaults.
   }
@@ -51,6 +59,7 @@ function loadOptions(): FeedOptions {
   const priorities = Array.isArray(saved.priorities) ? ALL_PRIORITIES.filter((p) => (saved.priorities as unknown[]).includes(p)) : [];
   return {
     tasks: bool(saved.tasks, DEFAULT_OPTIONS.tasks),
+    journals: bool(saved.journals, DEFAULT_OPTIONS.journals),
     completed: bool(saved.completed, DEFAULT_OPTIONS.completed),
     subtasks: bool(saved.subtasks, DEFAULT_OPTIONS.subtasks),
     priorities: priorities.length > 0 ? priorities : DEFAULT_OPTIONS.priorities,
@@ -63,12 +72,16 @@ function loadOptions(): FeedOptions {
 /** The list's subscription URL, for Google Calendar's "Other calendars → From URL". */
 function feedUrl(client: CalDavClient, calendar: Calendar, token: string, options: FeedOptions): string {
   const url = `${window.location.origin}/feed/${token}/${client.relativePath(calendar.href)}`;
-  if (!options.tasks) return url;
+  if (!options.tasks && !options.journals) return url;
   // Built by hand so the priority list keeps its plain commas instead of %2C.
-  const params = ['tasks=1'];
-  if (!options.completed) params.push('completed=0');
-  if (!options.subtasks) params.push('subtasks=0');
-  if (options.priorities.length < ALL_PRIORITIES.length) params.push(`priority=${options.priorities.join(',')}`);
+  const params: string[] = [];
+  if (options.tasks) {
+    params.push('tasks=1');
+    if (!options.completed) params.push('completed=0');
+    if (!options.subtasks) params.push('subtasks=0');
+    if (options.priorities.length < ALL_PRIORITIES.length) params.push(`priority=${options.priorities.join(',')}`);
+  }
+  if (options.journals) params.push('journals=1');
   if (options.html) params.push('format=html');
   // Remembered while the HTML is off, but only part of the link with it.
   if (options.html && options.appLinksAsText) params.push('applinks=text');
@@ -76,8 +89,8 @@ function feedUrl(client: CalDavClient, calendar: Calendar, token: string, option
   return `${url}?${params.join('&')}`;
 }
 
-export function ShareModal({ client, calendar, token, onClose }: Props) {
-  const [options, setOptions] = useState(loadOptions);
+export function ShareModal({ client, calendar, token, section = 'tasks', onClose }: Props) {
+  const [options, setOptions] = useState(() => loadOptions(section));
   const url = feedUrl(client, calendar, token, options);
 
   useEffect(() => {
@@ -91,7 +104,7 @@ export function ShareModal({ client, calendar, token, onClose }: Props) {
   function update(patch: Partial<FeedOptions>) {
     const next = { ...options, ...patch };
     setOptions(next);
-    saveSetting(OPTIONS_KEY, JSON.stringify(next));
+    saveSetting(OPTIONS_KEYS[section], JSON.stringify(next));
   }
 
   function togglePriority(priority: Priority) {
@@ -131,7 +144,9 @@ export function ShareModal({ client, calendar, token, onClose }: Props) {
             <p className="muted">
               {options.tasks
                 ? 'Each task with a due date becomes an event on that date. Events in the list stay as they are.'
-                : 'The calendar exactly as stored. Google Calendar ignores tasks, so only its events show up.'}
+                : options.journals
+                  ? 'Tasks are left out. Events in the list stay as they are.'
+                  : 'The calendar exactly as stored. Google Calendar ignores tasks, so only its events show up.'}
             </p>
 
             {options.tasks && (
@@ -174,6 +189,22 @@ export function ShareModal({ client, calendar, token, onClose }: Props) {
                     })}
                   </div>
                 </div>
+              </div>
+            )}
+
+            <div className="settings-row">
+              <label className="switch settings-switch">
+                <input type="checkbox" checked={options.journals} onChange={(e) => update({ journals: e.target.checked })} />
+                <span className="switch-track" aria-hidden="true" />
+                Show journal entries as events
+              </label>
+            </div>
+            <p className="muted">
+              Journal entries with a date (jtx Board and similar) become events on that date. Undated notes are left out.
+            </p>
+
+            {(options.tasks || options.journals) && (
+              <>
                 <div className="settings-row">
                   <label className="switch settings-switch">
                     <input type="checkbox" checked={options.html} onChange={(e) => update({ html: e.target.checked })} />
@@ -202,16 +233,16 @@ export function ShareModal({ client, calendar, token, onClose }: Props) {
                   </div>
                 )}
                 <div className="settings-row">
-                  <span className="settings-label">Timed tasks last</span>
+                  <span className="settings-label">Timed items last</span>
                   <Select
                     className="settings-select"
-                    aria-label="Timed tasks last"
+                    aria-label="Timed items last"
                     value={String(options.duration)}
                     onChange={(duration) => update({ duration: Number(duration) })}
                     options={DURATIONS}
                   />
                 </div>
-              </div>
+              </>
             )}
           </div>
 
