@@ -34,7 +34,7 @@ backend/
     tasks.ts      tasks=1: tasks turned into events (VTODO -> VEVENT, ical.js), shaped by the task options
     journals.ts   journals=1: dated journal entries turned into events (VJOURNAL -> VEVENT)
 frontend/         The Expo app: its own package.json and node_modules (Expo pins its own React), not an npm workspace
-  index.ts          Entry: src/polyfills.ts (Web Crypto from expo-crypto, localStorage from expo-sqlite), then Expo Router
+  index.ts          Entry: src/polyfills.ts (Web Crypto from expo-crypto, localStorage from expo-sqlite, an English Intl.ListFormat for Hermes), then Expo Router
   metro.config.js   Watches ../shared; the web dev server forwards /proxy, /api and /feed to the backend
   src/app/          Expo Router screens: login, index (redirects), tasks/ and journal/. Each of those has a _layout (provider,
                     Stack, toast), index (the page) and [uid] (the modal over it, a transparentModal screen). The root _layout
