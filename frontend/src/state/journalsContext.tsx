@@ -1,9 +1,11 @@
-import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
 import type { Calendar } from '../api/caldav.ts';
 import type { Journal, JournalEdits } from '../api/journals.ts';
 import type { ToastMessage } from '../components/controls/Toast.tsx';
+import type { RootParams } from '../navigation.tsx';
 import { useLoggedIn } from './session.tsx';
 import { useJournalList } from './useJournalList.ts';
 import { readSetting, saveSetting } from '../lib/viewSettings.ts';
@@ -17,7 +19,7 @@ export const ALL = 'all';
  * (/journal/<uid>), as frontend-react's JournalPage held it.
  */
 function useJournalsState() {
-  const router = useRouter();
+  const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();
   const { client, journals: calendars, signOut, setJournals } = useLoggedIn();
 
   const canShowAll = calendars.length > 1;
@@ -100,7 +102,8 @@ function useJournalsState() {
     creatingJournal,
     /** Where a new entry goes unless the modal picks another journal. */
     newEntryCalendar: calendar ?? calendars[0],
-    openEntry: (journal: Journal) => router.push({ pathname: '/journal/[uid]', params: { uid: journal.uid } }),
+    // Through the root navigator, as openTask in tasksContext.
+    openEntry: (journal: Journal) => navigation.navigate('Journal', { screen: 'Entry', params: { uid: journal.uid } }),
   };
 }
 

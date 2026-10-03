@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { useLinkProps } from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,8 +9,8 @@ import { IconButton } from './controls/ui.tsx';
 import { LogoMark } from './LogoMark.tsx';
 
 const SECTIONS = [
-  { name: 'tasks', label: 'Tasks', path: '/tasks' },
-  { name: 'journal', label: 'Journal', path: '/journal' },
+  { name: 'tasks', label: 'Tasks', screen: 'Tasks' },
+  { name: 'journal', label: 'Journal', screen: 'Journal' },
 ] as const;
 
 /** Below this width the brand name and the username are left out, so the tabs fit. */
@@ -37,21 +37,9 @@ export function TopBar({ section, onSettings }: Props) {
             {!narrow && <Text style={styles.brandText}>ToDoDAV</Text>}
           </View>
           <View role="tablist" aria-label="Sections" style={styles.tabs}>
-            {SECTIONS.map(({ name, label, path }) => {
-              const current = section === name;
-              return (
-                // Link passes its props down to the Pressable, and refuses a style array.
-                <Link key={name} href={path} asChild>
-                  <Pressable
-                    role="tab"
-                    aria-selected={current}
-                    style={StyleSheet.flatten([styles.tab, current && { borderBottomColor: colors.accent }])}
-                  >
-                    <Text style={[styles.tabText, { color: current ? colors.text : colors.textSecondary }]}>{label}</Text>
-                  </Pressable>
-                </Link>
-              );
-            })}
+            {SECTIONS.map(({ name, label, screen }) => (
+              <Tab key={name} label={label} screen={screen} current={section === name} />
+            ))}
           </View>
         </View>
         <View style={styles.account}>
@@ -70,6 +58,29 @@ export function TopBar({ section, onSettings }: Props) {
         </View>
       </View>
     </SafeAreaView>
+  );
+}
+
+/**
+ * A section's tab: a real link on the web (/tasks, /journal), so it can be opened in a new tab. The section keeps one
+ * screen (getId in navigation.tsx), so switching brings it back as it was left.
+ */
+function Tab({ label, screen, current }: { label: string; screen: 'Tasks' | 'Journal'; current: boolean }) {
+  const colors = useColors();
+  const styles = makeStyles(colors);
+  const { href, onPress } = useLinkProps({ screen });
+  // Pressable has no href in React Native's types, but react-native-web renders a View with one as an <a>.
+  const link = { href } as object;
+  return (
+    <Pressable
+      {...link}
+      onPress={onPress}
+      role="tab"
+      aria-selected={current}
+      style={[styles.tab, current && { borderBottomColor: colors.accent }]}
+    >
+      <Text style={[styles.tabText, { color: current ? colors.text : colors.textSecondary }]}>{label}</Text>
+    </Pressable>
   );
 }
 

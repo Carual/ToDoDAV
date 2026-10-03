@@ -1,9 +1,11 @@
-import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import type { Calendar } from '../api/caldav.ts';
 import type { Task, TaskEdits } from '../api/tasks.ts';
 import type { ToastMessage } from '../components/controls/Toast.tsx';
+import type { RootParams } from '../navigation.tsx';
 import { describeDue } from '../lib/format.ts';
 import { useLoggedIn } from './session.tsx';
 import { plural, taskOrder, type ListView } from '../lib/taskRows.ts';
@@ -20,7 +22,7 @@ export const ALL = 'all';
  * as frontend-react's MainPage held it.
  */
 function useTasksState() {
-  const router = useRouter();
+  const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();
   const { client, calendars, signOut } = useLoggedIn();
 
   // "All" only makes sense with several lists, and is where the app starts then, like Todoist's all-projects views.
@@ -161,7 +163,8 @@ function useTasksState() {
     createTask: (edits: TaskEdits, calendarHref: string) => list.create(calendarHref, edits),
     /** Where a new task goes unless the modal picks another list. */
     newTaskCalendar: calendar ?? calendars[0],
-    openTask: (task: Task) => router.push({ pathname: '/tasks/[uid]', params: { uid: task.uid } }),
+    // The provider sits above the section's own stack, so this goes through the root navigator.
+    openTask: (task: Task) => navigation.navigate('Tasks', { screen: 'Task', params: { uid: task.uid } }),
   };
 }
 

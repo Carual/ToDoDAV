@@ -13,7 +13,7 @@ browser (frontend: all the logic)  ──►  backend: /proxy/*  ──►  your
 
 - **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`. It is legacy: it stays as it is until `frontend/` does everything it does, and is then deleted.
 - **`frontend/`**: the new main frontend, in progress. React Native with Expo, for web, Android and iOS from one codebase. In the browser it goes through `/proxy` like `frontend-react`; the phone apps can also talk to a CalDAV server directly, since CORS doesn't apply to them (`Transport` in `src/api/caldav.ts`). Its own `AGENTS.md` has the Expo-specific rules.
-  - **The task and journal modals** are the screens `/tasks/[uid]` and `/journal/[uid]` (new ones: the same component in its own `Modal`, not a screen). Both are built on `modalParts.tsx`. Unsaved changes are guarded by `useLeavePrompt`: `usePreventRemove` (×, Cancel, Android's back button) and, on the web, `leaveGuard.ts` for the browser's Back/Forward, which the navigator doesn't see; actions that leave on purpose (save, delete, complete) set `leavingOnPurpose` first. They close with `router.dismissTo('/tasks')` (or `/journal`): a task link opened directly gets the list under it (`unstable_settings`), which carries the task's params. From 768 px wide the details sit in a sidebar, below that under the task. The time box is in the time picker's panel, not in the field: on a phone the panel's Modal would take the keyboard from a field under it.
+  - **The task and journal modals** are the screens `Task` (`/tasks/<uid>`) and `Entry` (`/journal/<uid>`) (new ones: the same component in its own `Modal`, not a screen). Both are built on `modalParts.tsx`. Unsaved changes are guarded by `useLeavePrompt`: `usePreventRemove` (×, Cancel, Android's back button) and, on the web, `leaveGuard.ts` for the browser's Back/Forward, which the navigator doesn't see; actions that leave on purpose (save, delete, complete) set `leavingOnPurpose` first. They close with `navigation.popTo('TaskList')` (or `EntryList`): a task link opened directly gets the list under it too (`initialRouteName` in the linking config). From 768 px wide the details sit in a sidebar, below that under the task. The time box is in the time picker's panel, not in the field: on a phone the panel's Modal would take the keyboard from a field under it.
   - **Login on Android/iOS** also asks for the server's address (`https://` is assumed; `http://` only in development builds, since Basic auth sends the password with every request). An address that answers `/api/status` with `{"status":"ok"}` is a ToDoDAV server, used through its `/proxy` (and its feeds); any other is the CalDAV server itself, and when its address isn't a CalDAV root, `/.well-known/caldav` is tried. The login and the resolved transport are kept with `expo-secure-store`, so the app stays logged in; only a `401` at startup forgets them (an unreachable server keeps them for the next start). The address and username, never the password, are kept in `localStorage` to fill the form after logging out.
 - **`backend/`**: a minimal Express proxy that also serves the built app. It exists only because browsers cannot talk to most CalDAV servers directly (CORS, auth prompts, mixed hosts). It stores nothing.
 
@@ -34,12 +34,14 @@ backend/
     tasks.ts      tasks=1: tasks turned into events (VTODO -> VEVENT, ical.js), shaped by the task options
     journals.ts   journals=1: dated journal entries turned into events (VJOURNAL -> VEVENT)
 frontend/         The Expo app: its own package.json and node_modules (Expo pins its own React), not an npm workspace
-  index.ts          Entry: src/polyfills.ts (Web Crypto from expo-crypto, localStorage from expo-sqlite, an English Intl.ListFormat for Hermes), then Expo Router
+  index.ts          Entry: src/polyfills.ts (Web Crypto from expo-crypto, localStorage from expo-sqlite, an English Intl.ListFormat for Hermes),
+                    src/leaveGuard.ts, then registers src/App.tsx (safe areas, SessionProvider, splash screen, Navigation)
   metro.config.js   Watches ../shared; the web dev server forwards /proxy, /api and /feed to the backend
-  src/app/          Expo Router screens: login, index (redirects), tasks/ and journal/. Each of those has a _layout (provider,
-                    Stack, toast), index (the page) and [uid] (the modal over it, a transparentModal screen). The root _layout
-                    guards them with Stack.Protected and marks them dangerouslySingular, so the TopBar's Tasks | Journal tabs
-                    bring the other page back as it was left instead of stacking a new copy
+  src/navigation.tsx  Every screen, its URL and its options, in one file (React Navigation; file names don't make routes). Without a
+                    session only Login; with one, the Tasks and Journal sections, each a provider, a stack (the page, and the
+                    task or entry over it as a transparentModal) and a toast. A fixed getId keeps one of each section, so the
+                    TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy
+  src/screens/      LoginScreen, TasksScreen, TaskScreen, JournalScreen, EntryScreen
   src/api/          The CalDAV, iCalendar and Todoist logic copied from frontend-react, plus connect.ts: logIn, and on
                     Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
   src/state/        Hooks and contexts: useCalendarObjects, useTaskList, useJournalList; tasksContext (what frontend-react's
@@ -56,7 +58,7 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     ui: Button, IconButton, SwitchRow, icons)
                     The logic copied from frontend-react (api/, state/, lib/) is kept identical apart from import paths,
                     except caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)
-  src/leaveGuard.ts On the web, a popstate listener loaded before the router, so the task modal can ask before Back/Forward
+  src/leaveGuard.ts On the web, a popstate listener loaded before the navigator, so the task modal can ask before Back/Forward
   src/theme.ts      The colors of frontend-react's styles.css, light and dark
 shared/
   markdown.ts     Markdown parser (plain TypeScript): the app renders it, the feed turns it into plain text or HTML
