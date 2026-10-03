@@ -11,7 +11,10 @@ browser (frontend: all the logic)  ──►  backend: /proxy/*  ──►  your
                                         credential check         (CALDAV_URL in env)
 ```
 
-- **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`.
+- **`frontend-react/`**: the Todoist-style web app (React + Vite). It speaks CalDAV itself (PROPFIND, REPORT, PUT...) against `/proxy/...`. It is legacy: it stays as it is until `frontend/` does everything it does, and is then deleted.
+- **`frontend/`**: the new main frontend, in progress. React Native with Expo, for web, Android and iOS from one codebase. In the browser it goes through `/proxy` like `frontend-react`; the phone apps can also talk to a CalDAV server directly, since CORS doesn't apply to them (`Transport` in `src/api/caldav.ts`). Its own `AGENTS.md` has the Expo-specific rules.
+  - **The task modal** is the screen `/tasks/[uid]` (new tasks: the same component in its own `Modal`, not a screen). Unsaved changes are guarded with `usePreventRemove` (×, Cancel, Android's back button) and, on the web, `leaveGuard.ts` for the browser's Back/Forward, which the navigator doesn't see; actions that leave on purpose (save, delete, complete) set `leavingOnPurpose` first. It closes with `router.dismissTo('/tasks')`: a task link opened directly gets the list under it (`unstable_settings`), which carries the task's params. From 768 px wide the details sit in a sidebar, below that under the task. The time box is in the time picker's panel, not in the field: on a phone the panel's Modal would take the keyboard from a field under it.
+  - **Login on Android/iOS** also asks for the server's address (`https://` is assumed; `http://` only in development builds, since Basic auth sends the password with every request). An address that answers `/api/status` with `{"status":"ok"}` is a ToDoDAV server, used through its `/proxy` (and its feeds); any other is the CalDAV server itself, and when its address isn't a CalDAV root, `/.well-known/caldav` is tried. The login and the resolved transport are kept with `expo-secure-store`, so the app stays logged in; only a `401` at startup forgets them (an unreachable server keeps them for the next start). The address and username, never the password, are kept in `localStorage` to fill the form after logging out.
 - **`backend/`**: a minimal Express proxy that also serves the built app. It exists only because browsers cannot talk to most CalDAV servers directly (CORS, auth prompts, mixed hosts). It stores nothing.
 
 The tooling (`package.json`, `tsconfig.json`, `.env`) lives at the repository root. npm manages dependencies. Bun is the primary runtime, and Node works too. Both run the TypeScript directly, with no build step for the backend.
@@ -30,6 +33,24 @@ backend/
     event.ts      The options, and what both conversions share: copied properties, title, description, end time
     tasks.ts      tasks=1: tasks turned into events (VTODO -> VEVENT, ical.js), shaped by the task options
     journals.ts   journals=1: dated journal entries turned into events (VJOURNAL -> VEVENT)
+frontend/         The Expo app: its own package.json and node_modules (Expo pins its own React), not an npm workspace
+  index.ts          Entry: src/polyfills.ts (Web Crypto from expo-crypto, localStorage from expo-sqlite), then Expo Router
+  metro.config.js   Watches ../shared; the web dev server forwards /proxy, /api and /feed to the backend
+  src/app/          Expo Router screens: login, index (redirects), and tasks/: _layout (TasksProvider, Stack, toast), index (the list),
+                    [uid] (the task modal over it, a transparentModal screen); the root _layout guards them with Stack.Protected
+  src/tasksContext.tsx  What frontend-react's MainPage held (useTaskList, tree, settings, completing, deleting), shared by both screens
+  src/components/   TaskModal, TaskItem, DatePicker, TimeField, RepeatField, Select, Menu, ConfirmDialog, Popover (a transparent
+                    Modal placed by measureInWindow), Toast, ui (Button, IconButton, SwitchRow), icons (react-native-svg)
+  src/leaveGuard.ts On the web, a popstate listener loaded before the router, so the task modal can ask before Back/Forward
+  src/download.ts   Saving a file: a Blob link on the web, download.native.ts hands it to the share sheet (expo-sharing)
+  src/taskRows.ts   Sorting and nesting the rows (from frontend-react's MainPage)
+  src/markdown.tsx  Inline Markdown as nested <Text>, links through Linking (parser in shared/)
+  src/api/, src/*.ts  The platform-neutral logic copied from frontend-react before journals (VJOURNAL) were added; caldav.ts uses
+                    @xmldom/xmldom and a Transport
+  src/api/connect.ts  logIn, and on Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
+  src/session.tsx     The session context: restores the saved login at startup (splash screen up meanwhile)
+  src/loginStore.ts   The saved login: sessionStorage on the web, expo-secure-store (Keystore/Keychain) on Android/iOS
+  src/theme.ts        The colors of frontend-react's styles.css, light and dark
 shared/
   markdown.ts     Markdown parser (plain TypeScript): the app renders it, the feed turns it into plain text or HTML
 frontend-react/
@@ -219,6 +240,8 @@ Or separately, in two terminals:
 npm run dev:backend     # the proxy on :3852 (Bun, reads .env, restarts on changes)
 npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to the backend
 ```
+
+For `frontend/`, run `npm install` in it once, then `npm run dev:app` for the Expo dev server: the QR code opens the app in Expo Go on a phone, `a` in the Android emulator, `w` in the browser. It must have the terminal to itself, since Expo only shows the QR code and reads keys when its output is a terminal (not under `concurrently`). The web build and ToDoDAV URLs also need `npm run dev:backend` in a second terminal; the phone talking to a CalDAV server directly doesn't. To work on the PC only, `npm run dev:web` runs the backend and the web build together (http://localhost:8081; no QR code or keys there). `npm run typecheck:app` typechecks it.
 
 Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`. `npm run build` typechecks and builds the app into `dist/frontend-react/` (`npm run build:frontend` skips the typecheck), and `npm run start` then serves the app and backend on Bun without watching.
 

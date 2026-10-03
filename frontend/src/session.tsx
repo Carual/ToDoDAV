@@ -1,0 +1,82 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+
+import { CalDavError, type Calendar } from './api/caldav.ts';
+import { logIn, type Session } from './api/connect.ts';
+import { readLogin, writeLogin, type StoredLogin } from './loginStore.ts';
+
+interface SessionContextValue {
+  session: Session | null;
+  /** True while the saved login is being tried at startup. */
+  restoring: boolean;
+  /** Why the saved login didn't work at startup, for the login screen. */
+  restoreError: string | null;
+  signIn: (session: Session, login: StoredLogin) => void;
+  signOut: () => void;
+  setCalendars: (calendars: Calendar[]) => void;
+}
+
+const SessionContext = createContext<SessionContextValue | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null);
+  const [restoring, setRestoring] = useState(true);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+
+  // Log in again silently with the saved login (after a reload on the web, at every start on Android/iOS).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const login = await readLogin();
+      if (!login) return;
+      try {
+        const restored = await logIn(login, login.transport);
+        if (!cancelled) setSession(restored);
+      } catch (error) {
+        // Only a refused password makes the saved login useless; when the server can't be reached it is kept for
+        // the next start.
+        if (error instanceof CalDavError && error.status === 401) await writeLogin(null);
+        if (!cancelled) setRestoreError(error instanceof Error ? error.message : 'Could not log in.');
+      }
+    })().finally(() => {
+      if (!cancelled) setRestoring(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const signIn = useCallback((next: Session, login: StoredLogin) => {
+    void writeLogin(login);
+    setRestoreError(null);
+    setSession(next);
+  }, []);
+
+  const signOut = useCallback(() => {
+    void writeLogin(null);
+    setSession(null);
+  }, []);
+
+  const setCalendars = useCallback(
+    (calendars: Calendar[]) => setSession((current) => current && { ...current, calendars }),
+    [],
+  );
+
+  const value = useMemo(
+    () => ({ session, restoring, restoreError, signIn, signOut, setCalendars }),
+    [session, restoring, restoreError, signIn, signOut, setCalendars],
+  );
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function useSession(): SessionContextValue {
+  const value = useContext(SessionContext);
+  if (!value) throw new Error('useSession must be used inside SessionProvider.');
+  return value;
+}
+
+/** The logged-in session, for screens that only exist while logged in. */
+export function useLoggedIn(): Session & Pick<SessionContextValue, 'signOut' | 'setCalendars'> {
+  const { session, signOut, setCalendars } = useSession();
+  if (!session) throw new Error('This screen needs a session.');
+  return { ...session, signOut, setCalendars };
+}
