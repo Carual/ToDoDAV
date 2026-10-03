@@ -66,7 +66,7 @@ export function Popover({ anchor, onClose, children, matchWidth = false, maxHeig
       <View
         style={[
           styles.panel,
-          { backgroundColor: colors.bg, borderColor: colors.border, shadowColor: '#000' },
+          { backgroundColor: colors.bg, borderColor: colors.border },
           { width, minWidth: matchWidth ? box?.width : undefined, maxWidth: window.width - 2 * MARGIN },
           position,
         ]}
@@ -87,9 +87,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     overflow: 'hidden',
-    elevation: 8,
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
   },
 });

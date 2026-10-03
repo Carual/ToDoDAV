@@ -73,8 +73,13 @@ function basicAuth({ username, password }: Credentials): string {
 function parseMultistatus(xml: string): DavResponse[] {
   let doc;
   try {
-    // xmldom rather than the browser's DOMParser, which React Native doesn't have.
-    doc = new DOMParser().parseFromString(xml, 'application/xml');
+    // xmldom rather than the browser's DOMParser, which React Native doesn't have. Errors stop it, as they stop the
+    // browser's; warnings (odd but readable input) are ignored, instead of xmldom logging them as console errors.
+    doc = new DOMParser({
+      onError: (level, message) => {
+        if (level !== 'warning') throw new Error(message);
+      },
+    }).parseFromString(xml, 'application/xml');
   } catch {
     throw new CalDavError(502, 'The CalDAV server sent an answer that is not valid XML.');
   }

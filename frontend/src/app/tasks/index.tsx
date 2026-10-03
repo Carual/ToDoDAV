@@ -14,12 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Task } from '../../api/tasks.ts';
 import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/icons.tsx';
-import { LogoMark } from '../../components/LogoMark.tsx';
 import { Select } from '../../components/Select.tsx';
 import { TaskItem } from '../../components/TaskItem.tsx';
 import { TaskModal } from '../../components/TaskModal.tsx';
+import { TopBar } from '../../components/TopBar.tsx';
 import { IconButton } from '../../components/ui.tsx';
-import { useLoggedIn } from '../../session.tsx';
 import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../../taskRows.ts';
 import { ALL, useTasks } from '../../tasksContext.tsx';
 import { useColors, type Colors } from '../../theme.ts';
@@ -42,7 +41,6 @@ export default function TasksScreen() {
   const styles = makeStyles(colors);
   const { width } = useWindowDimensions();
   const narrow = width < NARROW;
-  const { client, signOut } = useLoggedIn();
   const {
     calendars,
     selected,
@@ -275,22 +273,8 @@ export default function TasksScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.page} edges={['top', 'left', 'right']}>
-      <View style={styles.topbar}>
-        <View style={styles.brand}>
-          <LogoMark size={20} />
-          <Text style={styles.brandText}>ToDoDAV</Text>
-        </View>
-        <View style={styles.account}>
-          <View style={styles.avatar} aria-hidden>
-            <Text style={styles.avatarText}>{client.username.slice(0, 1).toUpperCase()}</Text>
-          </View>
-          {!narrow && <Text style={styles.accountName}>{client.username}</Text>}
-          <Pressable role="button" onPress={signOut} hitSlop={8}>
-            <Text style={styles.link}>Log out</Text>
-          </Pressable>
-        </View>
-      </View>
+    <SafeAreaView style={styles.page} edges={['left', 'right']}>
+      <TopBar section="tasks" />
       {content}
 
       {creating && newTaskCalendar && (
@@ -310,28 +294,6 @@ export default function TasksScreen() {
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     page: { flex: 1, backgroundColor: colors.bg },
-    topbar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      height: 48,
-      paddingHorizontal: 16,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: colors.divider,
-    },
-    brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    brandText: { fontSize: 16, fontWeight: '700', color: colors.text },
-    account: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    avatar: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      backgroundColor: colors.p2,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    avatarText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-    accountName: { color: colors.text, fontWeight: '600', fontSize: 14 },
     link: { color: colors.link, fontSize: 14 },
     column: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingTop: 24 },
     listEnd: { paddingBottom: 96 },

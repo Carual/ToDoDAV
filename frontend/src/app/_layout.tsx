@@ -31,14 +31,18 @@ function RootStack() {
 
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: colors.bg, text: colors.text, primary: colors.accent } };
-  // Protected screens: without a session only /login exists, with one only /tasks... Logging in or out removes
-  // the screen the user was on, and the router moves to the first one available.
+  // Protected screens: without a session only /login exists, with one only the app (/tasks..., /journal...).
+  // Logging in or out removes the screen the user was on, and the router moves to the first one available.
+  // Tasks and Journal are the TopBar's tabs: `dangerouslySingular` keeps one of each, so switching brings the other
+  // back to the top as it was left (lists, scroll position) instead of stacking a new copy, and Back returns to the
+  // one shown before.
   return (
     <ThemeProvider value={theme}>
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         <Stack.Protected guard={session !== null}>
-          <Stack.Screen name="tasks" />
+          <Stack.Screen name="tasks" dangerouslySingular options={{ animation: 'none' }} />
+          <Stack.Screen name="journal" dangerouslySingular options={{ animation: 'none' }} />
         </Stack.Protected>
         <Stack.Protected guard={session === null}>
           <Stack.Screen name="login" />

@@ -13,6 +13,7 @@ interface SessionContextValue {
   signIn: (session: Session, login: StoredLogin) => void;
   signOut: () => void;
   setCalendars: (calendars: Calendar[]) => void;
+  setJournals: (journals: Calendar[]) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -61,9 +62,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const setJournals = useCallback(
+    (journals: Calendar[]) => setSession((current) => current && { ...current, journals }),
+    [],
+  );
+
   const value = useMemo(
-    () => ({ session, restoring, restoreError, signIn, signOut, setCalendars }),
-    [session, restoring, restoreError, signIn, signOut, setCalendars],
+    () => ({ session, restoring, restoreError, signIn, signOut, setCalendars, setJournals }),
+    [session, restoring, restoreError, signIn, signOut, setCalendars, setJournals],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
@@ -75,8 +81,8 @@ export function useSession(): SessionContextValue {
 }
 
 /** The logged-in session, for screens that only exist while logged in. */
-export function useLoggedIn(): Session & Pick<SessionContextValue, 'signOut' | 'setCalendars'> {
-  const { session, signOut, setCalendars } = useSession();
+export function useLoggedIn(): Session & Pick<SessionContextValue, 'signOut' | 'setCalendars' | 'setJournals'> {
+  const { session, signOut, setCalendars, setJournals } = useSession();
   if (!session) throw new Error('This screen needs a session.');
-  return { ...session, signOut, setCalendars };
+  return { ...session, signOut, setCalendars, setJournals };
 }
