@@ -10,17 +10,23 @@ import {
 
 export interface Session {
   client: CalDavClient;
+  /** The task lists. */
   calendars: Calendar[];
+  /** The calendars that take journal entries (some are task lists too). */
+  journals: Calendar[];
   config: ServerConfig;
 }
 
-/** Logging in = asking the server for the user's task lists; it only works with the right credentials. */
+/** Logging in = asking the server for the user's task lists and journals; it only works with the right credentials. */
 export async function logIn(credentials: Credentials, transport: Transport): Promise<Session> {
   const client = new CalDavClient(credentials, transport);
   // The settings only add extras (feed links), so a backend or reverse proxy without /api/config
   // must not block the login.
-  const [calendars, config] = await Promise.all([client.discoverCalendars(), client.serverConfig().catch(() => NO_FEEDS)]);
-  return { client, calendars, config };
+  const [{ tasks, journals }, config] = await Promise.all([
+    client.discoverCalendars(),
+    client.serverConfig().catch(() => NO_FEEDS),
+  ]);
+  return { client, calendars: tasks, journals, config };
 }
 
 /**

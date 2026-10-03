@@ -1,5 +1,7 @@
 import { DOMParser, type Element } from '@xmldom/xmldom';
-import { newUid, parseTask, type Task } from './tasks.ts';
+import { newUid } from './ical.ts';
+import { parseJournal, type Journal } from './journals.ts';
+import { parseTask, type Task } from './tasks.ts';
 
 export interface Credentials {
   username: string;
@@ -26,6 +28,21 @@ export const NO_FEEDS: ServerConfig = {};
  * doesn't apply to them.
  */
 export type Transport = { kind: 'proxy'; origin: string } | { kind: 'direct'; url: string };
+
+/** The kinds of calendar objects ToDoDAV shows. */
+export type Component = 'VTODO' | 'VJOURNAL';
+
+/** The user's calendars that take tasks, and those that take journal entries (one can be in both). */
+export interface Calendars {
+  tasks: Calendar[];
+  journals: Calendar[];
+}
+
+/** What every stored calendar object (a task, a journal entry) carries. */
+export interface StoredObject {
+  href: string;
+  etag: string;
+}
 
 export class CalDavError extends Error {
   /** 0 means the server could not be reached. */
@@ -101,8 +118,8 @@ export class CalDavClient {
     this.transport = transport;
   }
 
-  /** Finds the user's task lists. It is also the login check: wrong credentials throw a 401 CalDavError. */
-  async discoverCalendars(): Promise<Calendar[]> {
+  /** Finds the user's task lists and journals. It is also the login check: wrong credentials throw a 401 CalDavError. */
+  async discoverCalendars(): Promise<Calendars> {
     const [root] = await this.propfind(null, 0, '<d:current-user-principal/>');
     if (!root) throw new CalDavError(502, 'The CalDAV server gave an empty answer.');
     // The href of /proxy/ itself tells which server path the proxy maps to.
@@ -120,18 +137,22 @@ export class CalDavClient {
       1,
       '<d:displayname/><d:resourcetype/><c:supported-calendar-component-set/><a:calendar-color/>',
     );
-    return responses.filter(isTaskList).map((response) => ({
+    const calendar = (response: DavResponse): Calendar => ({
       href: response.href,
       name: prop(response, DAV, 'displayname')?.textContent?.trim() || lastSegment(response.href),
       color: prop(response, APPLE, 'calendar-color')?.textContent?.trim().slice(0, 7) || undefined,
-    }));
+    });
+    return {
+      tasks: responses.filter((response) => supports(response, 'VTODO')).map(calendar),
+      journals: responses.filter((response) => supports(response, 'VJOURNAL')).map(calendar),
+    };
   }
 
   /**
-   * Creates a new task list in the calendar home (MKCALENDAR), limited to tasks so calendar apps don't offer it
-   * for events. Its path is random: display names are free text, and a path can't be renamed later.
+   * Creates a new task list (or journal) in the calendar home (MKCALENDAR), limited to that one kind so calendar
+   * apps don't offer it for events. Its path is random: display names are free text, and a path can't be renamed later.
    */
-  async createCalendar(name: string, color?: string): Promise<Calendar> {
+  async createCalendar(name: string, color?: string, component: Component = 'VTODO'): Promise<Calendar> {
     if (!this.home) throw new CalDavError(0, 'The task lists have not been loaded yet.');
     const href = `${this.home}${newUid()}/`;
     await this.send('MKCALENDAR', href, {
@@ -141,7 +162,7 @@ export class CalDavClient {
         `<c:mkcalendar xmlns:d="${DAV}" xmlns:c="${CALDAV}" xmlns:a="${APPLE}"><d:set><d:prop>` +
         `<d:displayname>${escapeXml(name)}</d:displayname>` +
         (color ? `<a:calendar-color>${escapeXml(color)}</a:calendar-color>` : '') +
-        '<c:supported-calendar-component-set><c:comp name="VTODO"/></c:supported-calendar-component-set>' +
+        `<c:supported-calendar-component-set><c:comp name="${component}"/></c:supported-calendar-component-set>` +
         '</d:prop></d:set></c:mkcalendar>',
     });
     return { href, name, color };
@@ -149,63 +170,60 @@ export class CalDavClient {
 
   /** All tasks (open and completed) of one list. */
   async listTasks(calendarHref: string): Promise<Task[]> {
-    const response = await this.send('REPORT', calendarHref, {
-      headers: { Depth: '1', 'Content-Type': XML },
-      body:
-        '<?xml version="1.0" encoding="utf-8"?>' +
-        `<c:calendar-query xmlns:d="${DAV}" xmlns:c="${CALDAV}">` +
-        '<d:prop><d:getetag/><c:calendar-data/></d:prop>' +
-        '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter>' +
-        '</c:calendar-query>',
-    });
-    const tasks: Task[] = [];
-    for (const item of parseMultistatus(await response.text())) {
-      const data = prop(item, CALDAV, 'calendar-data')?.textContent;
-      const etag = prop(item, DAV, 'getetag')?.textContent?.trim();
-      if (!data || !etag) continue;
+    return (await this.query(calendarHref, 'VTODO')).flatMap(({ href, etag, data }) => {
       try {
-        tasks.push(parseTask(item.href, etag, data));
+        return [parseTask(href, etag, data)];
       } catch {
-        // Skip objects that are not valid tasks instead of failing the whole list.
+        return []; // Skip objects that are not valid tasks instead of failing the whole list.
       }
-    }
-    return tasks;
+    });
+  }
+
+  /** All journal entries and notes of one journal. */
+  async listJournals(calendarHref: string): Promise<Journal[]> {
+    return (await this.query(calendarHref, 'VJOURNAL')).flatMap(({ href, etag, data }) => {
+      try {
+        return [parseJournal(href, etag, data)];
+      } catch {
+        return [];
+      }
+    });
   }
 
   /**
-   * Saves a task's new iCalendar text. Only succeeds if nobody changed it since it was loaded (If-Match);
-   * otherwise throws a 412 CalDavError. Returns the saved task.
+   * Saves an object's new iCalendar text. Only succeeds if nobody changed it since it was loaded (If-Match);
+   * otherwise throws a 412 CalDavError. Returns the new ETag.
    */
-  async saveTask(task: Task, ics: string): Promise<Task> {
-    const response = await this.send('PUT', task.href, {
-      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'If-Match': task.etag },
+  async saveObject({ href, etag }: StoredObject, ics: string): Promise<string> {
+    const response = await this.send('PUT', href, {
+      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'If-Match': etag },
       body: ics,
     });
     // Some servers do not return the new ETag; an empty one makes the next save reload first.
-    return parseTask(task.href, response.headers.get('ETag') ?? '', ics);
+    return response.headers.get('ETag') ?? '';
   }
 
-  /** Where a new task with this UID goes in a list, known before it is stored so it can be shown at once. */
-  taskHref(calendarHref: string, uid: string): string {
+  /** Where a new object with this UID goes in a calendar, known before it is stored so it can be shown at once. */
+  objectHref(calendarHref: string, uid: string): string {
     return `${calendarHref.endsWith('/') ? calendarHref : `${calendarHref}/`}${encodeURIComponent(uid)}.ics`;
   }
 
-  /** Stores a new task at `href`. If-None-Match: * guarantees it never overwrites an existing one. */
-  async createTask(href: string, ics: string): Promise<Task> {
+  /** Stores a new object at `href` and returns its ETag. If-None-Match: * guarantees it never overwrites one. */
+  async createObject(href: string, ics: string): Promise<string> {
     const response = await this.send('PUT', href, {
       headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'If-None-Match': '*' },
       body: ics,
     });
-    return parseTask(href, response.headers.get('ETag') ?? '', ics);
+    return response.headers.get('ETag') ?? '';
   }
 
   /**
-   * Deletes a task, only if nobody changed it since it was loaded (If-Match); otherwise throws a 412 CalDavError.
-   * A task already gone counts as deleted.
+   * Deletes an object, only if nobody changed it since it was loaded (If-Match); otherwise throws a 412 CalDavError.
+   * One already gone counts as deleted.
    */
-  async deleteTask(task: Task): Promise<void> {
+  async deleteObject({ href, etag }: StoredObject): Promise<void> {
     try {
-      await this.send('DELETE', task.href, { headers: { 'If-Match': task.etag } });
+      await this.send('DELETE', href, { headers: { 'If-Match': etag } });
     } catch (error) {
       if (!(error instanceof CalDavError && error.status === 404)) throw error;
     }
@@ -224,6 +242,24 @@ export class CalDavClient {
     // A regex rather than URL, whose React Native version is incomplete.
     const path = href.replace(/^https?:\/\/[^/]+/, '');
     return path.startsWith(this.basePath) ? path.slice(this.basePath.length) : path.replace(/^\//, '');
+  }
+
+  /** Every object of one kind in a calendar, with its ETag and iCalendar text. */
+  private async query(calendarHref: string, component: Component): Promise<{ href: string; etag: string; data: string }[]> {
+    const response = await this.send('REPORT', calendarHref, {
+      headers: { Depth: '1', 'Content-Type': XML },
+      body:
+        '<?xml version="1.0" encoding="utf-8"?>' +
+        `<c:calendar-query xmlns:d="${DAV}" xmlns:c="${CALDAV}">` +
+        '<d:prop><d:getetag/><c:calendar-data/></d:prop>' +
+        `<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="${component}"/></c:comp-filter></c:filter>` +
+        '</c:calendar-query>',
+    });
+    return parseMultistatus(await response.text()).flatMap((item) => {
+      const data = prop(item, CALDAV, 'calendar-data')?.textContent;
+      const etag = prop(item, DAV, 'getetag')?.textContent?.trim();
+      return data && etag ? [{ href: item.href, etag, data }] : [];
+    });
   }
 
   private async propfind(href: string | null, depth: 0 | 1, props: string): Promise<DavResponse[]> {
@@ -269,7 +305,7 @@ export class CalDavClient {
     if (response.ok) return response;
     if (response.status === 401) throw new CalDavError(401, 'Wrong username or password.');
     if (response.status === 412) {
-      throw new CalDavError(412, 'This task was changed somewhere else. The list has been reloaded, try again.');
+      throw new CalDavError(412, 'This was changed somewhere else. The list has been reloaded, try again.');
     }
     if (response.status === 403) {
       const body = await response.json().catch(() => null);
@@ -279,14 +315,15 @@ export class CalDavClient {
   }
 }
 
-function isTaskList(response: DavResponse): boolean {
+/** Whether the response is a calendar that takes this kind of object. */
+function supports(response: DavResponse, component: Component): boolean {
   const resourceType = prop(response, DAV, 'resourcetype');
   if (!resourceType?.getElementsByTagNameNS(CALDAV, 'calendar')[0]) return false;
   const components = prop(response, CALDAV, 'supported-calendar-component-set');
-  // No component set means the calendar accepts everything, tasks included.
+  // No component set means the calendar accepts everything.
   if (!components) return true;
   return Array.from(components.getElementsByTagNameNS(CALDAV, 'comp')).some(
-    (comp) => comp.getAttribute('name')?.toUpperCase() === 'VTODO',
+    (comp) => comp.getAttribute('name')?.toUpperCase() === component,
   );
 }
 

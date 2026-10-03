@@ -1,13 +1,27 @@
 import ICAL from 'ical.js';
+import {
+  categoriesOf,
+  dropOverridesIfSingle,
+  newCalendarObject,
+  newUid,
+  nowUtc,
+  pad,
+  parseCalendar,
+  sameDate,
+  setCategories,
+  setDate,
+  setLocation,
+  setText,
+  toDate,
+  toLocalDate,
+  touch,
+  type LocalDate,
+} from './ical.ts';
+
+export { newUid, sameDate, type LocalDate };
 
 /** Todoist-style priority: 1 is the highest (red), 4 means no priority. */
 export type Priority = 1 | 2 | 3 | 4;
-
-/** A date in local time: `date` is yyyy-mm-dd, `time` (optional) is HH:mm. */
-export interface LocalDate {
-  date: string;
-  time?: string;
-}
 
 export interface Task {
   /** Path of the .ics file on the CalDAV server. */
@@ -62,33 +76,8 @@ function priorityFromIcal(value: number): Priority {
 const PRIORITY_TO_ICAL: Record<Priority, number> = { 1: 1, 2: 5, 3: 9, 4: 0 };
 
 function parse(ics: string) {
-  const vcalendar = new ICAL.Component(ICAL.parse(ics));
-  // Register the time zones shipped in the file so TZID times convert correctly.
-  for (const vtimezone of vcalendar.getAllSubcomponents('vtimezone')) {
-    try {
-      ICAL.TimezoneService.register(vtimezone);
-    } catch {
-      // A broken VTIMEZONE only makes times fall back to floating local time.
-    }
-  }
-  // A repeating task can share its file with overrides of single occurrences (RECURRENCE-ID), in any order.
-  const todos = vcalendar.getAllSubcomponents('vtodo');
-  const vtodo = todos.find((todo) => !todo.hasProperty('recurrence-id')) ?? todos[0];
-  if (!vtodo) throw new Error('No VTODO in calendar object');
-  return { vcalendar, vtodo };
-}
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function toLocalDate(value: unknown): LocalDate | undefined {
-  if (!(value instanceof ICAL.Time)) return undefined;
-  if (value.isDate) return { date: `${value.year}-${pad(value.month)}-${pad(value.day)}` };
-  const d = value.toJSDate();
-  return { date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, time: `${pad(d.getHours())}:${pad(d.getMinutes())}` };
-}
-
-function toDate(value: unknown): Date | undefined {
-  return value instanceof ICAL.Time ? value.toJSDate() : undefined;
+  const { vcalendar, main } = parseCalendar(ics, 'vtodo');
+  return { vcalendar, vtodo: main };
 }
 
 /** RELATED-TO without RELTYPE means PARENT (RFC 5545 3.2.15); CHILD and SIBLING links are not followed. */
@@ -124,10 +113,7 @@ export function parseTask(href: string, etag: string, ics: string): Task {
     completed: status === 'COMPLETED' || vtodo.hasProperty('completed'),
     status,
     percentComplete: percent === undefined ? undefined : Number(percent),
-    categories: vtodo
-      .getAllProperties('categories')
-      .flatMap((property) => property.getValues().map(String))
-      .filter(Boolean),
+    categories: categoriesOf(vtodo),
     location: text('location'),
     url: text('url'),
     parentUid: parentUidOf(vtodo),
@@ -136,32 +122,6 @@ export function parseTask(href: string, etag: string, ics: string): Task {
     lastModified: toDate(vtodo.getFirstPropertyValue('last-modified')),
     completedAt: toDate(vtodo.getFirstPropertyValue('completed')),
   };
-}
-
-const nowUtc = () => ICAL.Time.fromJSDate(new Date(), true);
-
-/** Marks the task as changed, as RFC 5545 expects from every client that edits it. */
-function touch(vtodo: ICAL.Component) {
-  vtodo.updatePropertyWithValue('dtstamp', nowUtc());
-  vtodo.updatePropertyWithValue('last-modified', nowUtc());
-  vtodo.updatePropertyWithValue('sequence', Number(vtodo.getFirstPropertyValue('sequence') ?? 0) + 1);
-}
-
-function setText(vtodo: ICAL.Component, name: string, value: string) {
-  if (value) vtodo.updatePropertyWithValue(name, value);
-  else vtodo.removeAllProperties(name);
-}
-
-export const sameDate = (a?: LocalDate, b?: LocalDate) => a?.date === b?.date && a?.time === b?.time;
-
-/** All-day dates become DATE values; timed ones become UTC DATE-TIME values. */
-function setDate(vtodo: ICAL.Component, name: string, value: LocalDate | undefined) {
-  vtodo.removeAllProperties(name);
-  if (!value) return;
-  vtodo.addPropertyWithValue(
-    name,
-    value.time ? ICAL.Time.fromJSDate(new Date(`${value.date}T${value.time}`), true) : ICAL.Time.fromDateString(value.date),
-  );
 }
 
 /** Writes the editable fields into a VTODO. `previous` is the task as loaded (absent for a new task). */
@@ -189,44 +149,17 @@ function writeEdits(vtodo: ICAL.Component, edits: TaskEdits, previous?: Task) {
   if (edits.priority === 4) vtodo.removeAllProperties('priority');
   else vtodo.updatePropertyWithValue('priority', PRIORITY_TO_ICAL[edits.priority]);
 
-  vtodo.removeAllProperties('categories');
-  if (edits.categories.length > 0) {
-    const categories = new ICAL.Property('categories');
-    categories.setValues(edits.categories);
-    vtodo.addProperty(categories);
-  }
-
-  // Coordinates written by other apps (Apple Reminders, GEO) describe the old text, so they go with it.
-  const location = edits.location.trim();
-  if (location !== (previous?.location?.trim() ?? '')) {
-    setText(vtodo, 'location', location);
-    vtodo.removeAllProperties('x-apple-structured-location');
-    vtodo.removeAllProperties('geo');
-  }
+  setCategories(vtodo, edits.categories);
+  setLocation(vtodo, edits.location.trim(), previous?.location);
 }
 
 /** Returns the task's iCalendar text with the edits applied; every other property is kept as it was. */
 export function applyEdits(task: Task, edits: TaskEdits): string {
   const { vcalendar, vtodo } = parse(task.ics);
   writeEdits(vtodo, edits, task);
-  // Changed single occurrences (RECURRENCE-ID) mean nothing once the task no longer repeats.
-  if (!vtodo.hasProperty('rrule') && !vtodo.hasProperty('rdate')) {
-    for (const other of vcalendar.getAllSubcomponents('vtodo')) {
-      if (other !== vtodo && other.hasProperty('recurrence-id')) vcalendar.removeSubcomponent(other);
-    }
-  }
+  dropOverridesIfSingle(vcalendar, vtodo);
   touch(vtodo);
   return vcalendar.toString();
-}
-
-/** A random UUID. crypto.randomUUID only exists on HTTPS/localhost; getRandomValues works everywhere. */
-export function newUid(): string {
-  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40; // version 4
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80; // RFC 4122 variant
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 export interface NewTaskOptions {
@@ -245,16 +178,7 @@ export function newTaskIcs(
   edits: TaskEdits,
   { parentUid, uid = newUid(), created, completedAt }: NewTaskOptions = {},
 ): { uid: string; ics: string } {
-  const vcalendar = new ICAL.Component('vcalendar');
-  vcalendar.updatePropertyWithValue('version', '2.0');
-  vcalendar.updatePropertyWithValue('prodid', '-//ToDoDAV//EN');
-
-  const vtodo = new ICAL.Component('vtodo');
-  vcalendar.addSubcomponent(vtodo);
-  vtodo.updatePropertyWithValue('uid', uid);
-  vtodo.updatePropertyWithValue('dtstamp', nowUtc());
-  vtodo.updatePropertyWithValue('created', created ? ICAL.Time.fromJSDate(created, true) : nowUtc());
-  vtodo.updatePropertyWithValue('last-modified', nowUtc());
+  const { vcalendar, component: vtodo } = newCalendarObject('vtodo', uid, created);
   if (completedAt) {
     vtodo.updatePropertyWithValue('status', 'COMPLETED');
     vtodo.updatePropertyWithValue('completed', ICAL.Time.fromJSDate(completedAt, true));

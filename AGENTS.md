@@ -45,8 +45,8 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
   src/download.ts   Saving a file: a Blob link on the web, download.native.ts hands it to the share sheet (expo-sharing)
   src/taskRows.ts   Sorting and nesting the rows (from frontend-react's MainPage)
   src/markdown.tsx  Inline Markdown as nested <Text>, links through Linking (parser in shared/)
-  src/api/, src/*.ts  The platform-neutral logic copied from frontend-react before journals (VJOURNAL) were added; caldav.ts uses
-                    @xmldom/xmldom and a Transport
+  src/api/, src/*.ts  The platform-neutral logic copied from frontend-react (tasks, journals, ical, useCalendarObjects...), kept
+                    identical except: caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)
   src/api/connect.ts  logIn, and on Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
   src/session.tsx     The session context: restores the saved login at startup (splash screen up meanwhile)
   src/loginStore.ts   The saved login: sessionStorage on the web, expo-secure-store (Keystore/Keychain) on Android/iOS
