@@ -58,7 +58,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
 ## Deploying
 
-1. **Build the web app** into `dist/frontend-react/` (this also typechecks everything):
+1. **Build the web app** into `dist/frontend/` (this also typechecks everything):
 
    ```sh
    npm install
@@ -89,7 +89,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
    With nginx/openresty, make sure the proxy *overwrites* the scheme header: `proxy_set_header X-Forwarded-Proto $scheme;`. Without that header, requests are rejected with `403`.
 
-   If you'd rather have the reverse proxy serve the static files itself, point it at `dist/frontend-react/`, forward `/proxy/*`, `/api/*` and `/feed/*` to ToDoDAV, and answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
+   If you'd rather have the reverse proxy serve the static files itself, point it at `dist/frontend/`, forward `/proxy/*`, `/api/*` and `/feed/*` to ToDoDAV, and answer any other non-file path with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
 ### With Docker
 
@@ -111,6 +111,10 @@ docker run -d --name tododav --restart unless-stopped --init --env-file .env -p 
 ```
 
 Docker's `--env-file` takes values literally, so don't wrap them in quotes. To update, `docker rm -f tododav` and build and run again.
+
+## Android app
+
+`npm run build:apk` builds an installable APK into `dist/tododav.apk` on your own machine (run `npm install` in `frontend/` once first). It needs [Android Studio](https://developer.android.com/studio) installed, for its SDK and bundled JDK. Copy the APK to your phone and open it, or `adb install -r dist/tododav.apk`. At login, give it your ToDoDAV address (or your CalDAV server's), over `https://`.
 
 ## Calendar feeds (Google Calendar)
 

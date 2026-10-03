@@ -20,6 +20,8 @@ npx expo start              # dev server (QR code for Expo Go, `a` Android, `w` 
 npx tsc --noEmit            # typecheck (npm run typecheck)
 npx expo-doctor             # dependency and config problems
 npx expo install --fix      # bring packages back to the SDK's versions
+npm run export:web          # web build into ../dist/frontend/, which the backend serves (root: npm run build)
+npm run build:apk           # Android APK into ../dist/tododav.apk, built locally (scripts/build-apk.mjs)
 ```
 
 npm manages the dependencies here too, with this folder's own `package.json` and lockfile (not a workspace: Expo pins its own React and React Native versions).

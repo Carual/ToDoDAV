@@ -5,6 +5,9 @@ FROM node:24-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
+# The web app is the Expo app in frontend/, which has its own dependencies.
+COPY frontend/package.json frontend/package-lock.json frontend/
+RUN npm --prefix frontend ci
 COPY . .
 RUN npm run build
 

@@ -87,9 +87,9 @@ frontend-react/
   src/format.ts       Due-date labels, journal day headings, date formatting, and repeat rules in words
   src/repeat.ts       Repeat choices and the custom form <-> RRULE, moving a rule with its date, first occurrence
   src/router.ts       Tiny History-API router: /login, /tasks, /tasks/<uid>, /journal, /journal/<uid>
-  vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/
+  vite.config.ts      Dev server proxies /proxy, /api and /feed to the backend; build goes to dist/frontend-react/ (npm run build:react; no longer served)
 .env.example          Documented configuration
-Dockerfile            Builds with npm (node image), runs on Bun with only the production dependencies
+Dockerfile            Builds with npm (node image, the root's and frontend/'s dependencies), runs on Bun with only the production dependencies
 docker-compose.yaml   Example stack: container `tododav` on port 3852 (all addresses)
 ```
 
@@ -111,7 +111,7 @@ Security headers come from `helmet` (default CSP, plus `frame-src https://www.go
 
 `GET /api/config` tells the frontend what this install offers: `{"feed":{"token":"..."}}` (`feed` only when the feed is on). It has the same HTTPS and credential checks as `/proxy`, because it reveals the feed token, and is sent with `Cache-Control: no-store`. Keep it to settings the frontend needs; never the CalDAV credentials.
 
-**The built app.** The backend serves `dist/frontend-react/` (`npm run build`) with `express.static`, so one process and one origin cover everything and the reverse proxy only terminates TLS. Any other `GET` gets `index.html` (the client-side routes). The app is HTTPS-only in production like `/proxy`, because a login page served over plain HTTP would send the password in the clear before `/proxy` could refuse it. Serving `dist/frontend-react/` from the reverse proxy instead still works: it forwards `/proxy/*`, `/api/*` and `/feed/*` and answers other non-file paths with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
+**The built app.** The backend serves `dist/frontend/`, the Expo app's web export (`npm run build`), with `express.static`, so one process and one origin cover everything and the reverse proxy only terminates TLS. Any other `GET` gets `index.html` (the client-side routes). The app is HTTPS-only in production like `/proxy`, because a login page served over plain HTTP would send the password in the clear before `/proxy` could refuse it. Serving `dist/frontend/` from the reverse proxy instead still works: it forwards `/proxy/*`, `/api/*` and `/feed/*` and answers other non-file paths with `index.html` (Caddy `try_files {path} /index.html`, nginx `try_files $uri /index.html`).
 
 ### Feed (`/feed`)
 
@@ -255,7 +255,9 @@ npm run dev:frontend    # the app on http://localhost:5173, forwarding /proxy to
 
 For `frontend/`, run `npm install` in it once, then `npm run dev:app` for the Expo dev server: the QR code opens the app in Expo Go on a phone, `a` in the Android emulator, `w` in the browser. It must have the terminal to itself, since Expo only shows the QR code and reads keys when its output is a terminal (not under `concurrently`). The web build and ToDoDAV URLs also need `npm run dev:backend` in a second terminal; the phone talking to a CalDAV server directly doesn't. To work on the PC only, `npm run dev:web` runs the backend and the web build together (http://localhost:8081; no QR code or keys there). `npm run typecheck:app` typechecks it.
 
-Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`. `npm run build` typechecks and builds the app into `dist/frontend-react/` (`npm run build:frontend` skips the typecheck), and `npm run start` then serves the app and backend on Bun without watching.
+Each Bun script has a Node equivalent: `npm run dev:backend:node` and `npm run start:node`. `npm run build` typechecks everything (backend, `frontend-react/`, `frontend/`) and exports `frontend/` for the web into `dist/frontend/` (`npm run build:web` skips the typecheck), and `npm run start` then serves the app and backend on Bun without watching.
+
+`npm run build:apk` builds the Android app into `dist/tododav.apk`, locally and without EAS (`frontend/scripts/build-apk.mjs`): `expo prebuild --clean` regenerates `frontend/android/` from `app.json`, then Gradle's `assembleRelease`. It needs Android Studio's SDK and a JDK 17; when `ANDROID_HOME`/`JAVA_HOME` are unset, it looks where Android Studio installs them (its bundled JBR). The APK is signed with the debug keystore from Expo's template, which is enough to install it and update it over itself; the Play Store would need a keystore of its own. Being a release build, its login only accepts `https://` servers.
 
 Run `npm run typecheck` after changes; there is no test suite yet.
 

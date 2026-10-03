@@ -17,8 +17,10 @@
     "dev:frontend": "vite --config frontend-react/vite.config.ts",
     "dev:app": "npm --prefix frontend start",
     "dev:web": "concurrently --names backend,web --prefix-colors blue,green --kill-others-on-fail \"npm:dev:backend\" \"npm --prefix frontend run web\"",
-    "build": "npm run typecheck && npm run build:frontend",
-    "build:frontend": "vite build --config frontend-react/vite.config.ts",
+    "build": "npm run typecheck && npm run typecheck:app && npm run build:web",
+    "build:web": "npm --prefix frontend run export:web",
+    "build:apk": "npm --prefix frontend run build:apk",
+    "build:react": "vite build --config frontend-react/vite.config.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p frontend-react",
     "typecheck:app": "npm --prefix frontend run typecheck"
   },

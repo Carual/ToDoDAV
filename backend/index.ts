@@ -87,7 +87,7 @@ if (config.feed.enabled) app.use('/feed', requireHttps, requireFeedAccess(config
 
 // The built app (npm run build); any other path gets index.html for the client-side routes (/login, /tasks/<uid>).
 // HTTPS-only in production like /proxy, so the login page never sends the password in the clear.
-const frontendDir = fileURLToPath(new URL('../dist/frontend-react/', import.meta.url));
+const frontendDir = fileURLToPath(new URL('../dist/frontend/', import.meta.url));
 app.use(requireHttps, express.static(frontendDir));
 app.get('/{*path}', (_req, res) => res.sendFile('index.html', { root: frontendDir }));
 
