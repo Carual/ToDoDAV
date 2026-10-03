@@ -4,6 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLoggedIn } from '../state/session.tsx';
 import { useColors, type Colors } from '../theme.ts';
+import { GearIcon } from './controls/icons.tsx';
+import { IconButton } from './controls/ui.tsx';
 import { LogoMark } from './LogoMark.tsx';
 
 const SECTIONS = [
@@ -14,8 +16,14 @@ const SECTIONS = [
 /** Below this width the brand name and the username are left out, so the tabs fit. */
 const NARROW = 640;
 
+interface Props {
+  section: 'tasks' | 'journal';
+  /** Opens the settings; without it, the gear is left out (the settings are about tasks). */
+  onSettings?: () => void;
+}
+
 /** The bar at the top: the brand, Tasks | Journal (real links on the web), and the account with Log out. */
-export function TopBar({ section }: { section: 'tasks' | 'journal' }) {
+export function TopBar({ section, onSettings }: Props) {
   const colors = useColors();
   const styles = makeStyles(colors);
   const narrow = useWindowDimensions().width < NARROW;
@@ -47,6 +55,11 @@ export function TopBar({ section }: { section: 'tasks' | 'journal' }) {
           </View>
         </View>
         <View style={styles.account}>
+          {onSettings && (
+            <IconButton label="Settings" onPress={onSettings}>
+              <GearIcon color={colors.textSecondary} size={20} />
+            </IconButton>
+          )}
           <View style={styles.avatar} aria-hidden>
             <Text style={styles.avatarText}>{client.username.slice(0, 1).toUpperCase()}</Text>
           </View>

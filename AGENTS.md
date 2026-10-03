@@ -50,9 +50,10 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     frontend-react's MainPage), markdown.tsx (inline Markdown as nested <Text>, links through Linking; parser
                     in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet)
   src/components/   TopBar, LogoMark, and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
-                    fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField), journal/ (JournalModal, JournalItem)
-                    and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, Popover: a transparent Modal placed by
-                    measureInWindow, Toast, ui: Button, IconButton, SwitchRow, icons)
+                    fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField, SettingsModal, FilterModal), journal/
+                    (JournalModal, JournalItem) and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, SmallDialog:
+                    the frame of the settings and filters, Popover: a transparent Modal placed by measureInWindow, Toast,
+                    ui: Button, IconButton, SwitchRow, icons)
                     The logic copied from frontend-react (api/, state/, lib/) is kept identical apart from import paths,
                     except caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)
   src/leaveGuard.ts On the web, a popstate listener loaded before the router, so the task modal can ask before Back/Forward

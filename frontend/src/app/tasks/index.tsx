@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -13,8 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Task } from '../../api/tasks.ts';
-import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
+import { ChevronDownIcon, FilterIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
 import { Select } from '../../components/controls/Select.tsx';
+import { FilterModal } from '../../components/tasks/FilterModal.tsx';
+import { SettingsModal } from '../../components/tasks/SettingsModal.tsx';
 import { TaskItem } from '../../components/tasks/TaskItem.tsx';
 import { TaskModal } from '../../components/tasks/TaskModal.tsx';
 import { TopBar } from '../../components/TopBar.tsx';
@@ -22,7 +24,14 @@ import { IconButton } from '../../components/controls/ui.tsx';
 import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../../lib/taskRows.ts';
 import { ALL, useTasks } from '../../state/tasksContext.tsx';
 import { useColors, type Colors } from '../../theme.ts';
-import { DEFAULT_SETTINGS, describeFilters, filtersActive, readSetting, saveSetting } from '../../lib/viewSettings.ts';
+import {
+  DEFAULT_SETTINGS,
+  describeFilters,
+  filtersActive,
+  readSetting,
+  saveSetting,
+  type Filters,
+} from '../../lib/viewSettings.ts';
 
 const SHOW_COMPLETED_KEY = 'tododav.showCompleted';
 /** Below this width the layout is the phone one: narrower margins and indents. */
@@ -66,6 +75,8 @@ export default function TasksScreen() {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [editingFilters, setEditingFilters] = useState(false);
 
   function toggleCollapsed(uid: string) {
     const next = new Set(collapsed);
@@ -103,6 +114,11 @@ export default function TasksScreen() {
   const { filters } = settings;
   const filtered = filtersActive(filters);
   const fields = settings.fields.filter((f) => f.visible).map((f) => f.field);
+  const changeFilters = (next: Filters) => changeSettings({ ...settings, filters: next });
+  const labels = useMemo(
+    () => [...new Set(list.tasks.flatMap((t) => t.categories))].sort((a, b) => a.localeCompare(b)),
+    [list.tasks],
+  );
 
   const openTasks = openRows(list.tasks, tree, collapsed, view);
   const completedTasks = list.tasks.filter((t) => t.completed && view.matches(t)).sort(compareCompleted);
@@ -196,6 +212,9 @@ export default function TasksScreen() {
           {calendar?.name ?? 'All'}
         </Text>
         <View style={styles.viewActions}>
+          <IconButton label={filtered ? 'Filters (on)' : 'Filters'} active={filtered} onPress={() => setEditingFilters(true)}>
+            <FilterIcon color={filtered ? colors.accent : colors.textSecondary} size={20} />
+          </IconButton>
           {canShowAll && (
             <Select
               quiet
@@ -221,8 +240,10 @@ export default function TasksScreen() {
       </View>
       {filtered && (
         <View style={styles.filterBar}>
-          <Text style={styles.filterSummary}>Filtered: {describeFilters(filters).join(' · ')}</Text>
-          <Pressable role="button" hitSlop={8} onPress={() => changeSettings({ ...settings, filters: DEFAULT_SETTINGS.filters })}>
+          <Pressable role="button" onPress={() => setEditingFilters(true)} style={styles.filterSummary}>
+            <Text style={styles.filterSummaryText}>Filtered: {describeFilters(filters).join(' · ')}</Text>
+          </Pressable>
+          <Pressable role="button" hitSlop={8} onPress={() => changeFilters(DEFAULT_SETTINGS.filters)}>
             <Text style={styles.link}>Clear</Text>
           </Pressable>
         </View>
@@ -274,7 +295,7 @@ export default function TasksScreen() {
 
   return (
     <SafeAreaView style={styles.page} edges={['left', 'right']}>
-      <TopBar section="tasks" />
+      <TopBar section="tasks" onSettings={() => setEditingSettings(true)} />
       {content}
 
       {creating && newTaskCalendar && (
@@ -286,6 +307,12 @@ export default function TasksScreen() {
           onSave={createTask}
           onToggle={toggleTask}
         />
+      )}
+      {editingSettings && (
+        <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setEditingSettings(false)} />
+      )}
+      {editingFilters && (
+        <FilterModal filters={filters} labels={labels} onChange={changeFilters} onClose={() => setEditingFilters(false)} />
       )}
     </SafeAreaView>
   );
@@ -318,7 +345,8 @@ const makeStyles = (colors: Colors) =>
       borderRadius: 5,
       backgroundColor: colors.bgSoft,
     },
-    filterSummary: { flex: 1, fontSize: 13, color: colors.textSecondary },
+    filterSummary: { flex: 1 },
+    filterSummaryText: { fontSize: 13, color: colors.textSecondary },
     loading: { paddingVertical: 48 },
     addTask: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
     addIcon: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },

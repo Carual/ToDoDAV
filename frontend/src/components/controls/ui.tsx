@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from 'react';
-import { Pressable, Switch, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Switch, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { useColors } from '../../theme.ts';
 
@@ -79,7 +79,17 @@ export function IconButton({ label, onPress, children, active, filled, disabled,
 }
 
 /** A switch with its label, the whole row toggling it. */
-export function SwitchRow({ label, value, onChange }: { label: string; value: boolean; onChange: (value: boolean) => void }) {
+export function SwitchRow({
+  label,
+  value,
+  onChange,
+  labelStyle,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  labelStyle?: StyleProp<TextStyle>;
+}) {
   const colors = useColors();
   return (
     <Pressable role="switch" aria-checked={value} aria-label={label} onPress={() => onChange(!value)} style={styles.switchRow}>
@@ -95,7 +105,7 @@ export function SwitchRow({ label, value, onChange }: { label: string; value: bo
         aria-hidden
         style={styles.switch}
       />
-      <Text style={[styles.switchLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.switchLabel, { color: colors.textSecondary }, labelStyle]}>{label}</Text>
     </Pressable>
   );
 }
