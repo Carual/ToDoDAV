@@ -14,14 +14,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { LocalDate } from '../../api/ical.ts';
 import type { Journal } from '../../api/journals.ts';
-import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
+import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon, ShareIcon } from '../../components/controls/icons.tsx';
 import { JournalItem } from '../../components/journal/JournalItem.tsx';
 import { JournalModal } from '../../components/journal/JournalModal.tsx';
 import { Select } from '../../components/controls/Select.tsx';
+import { ShareModal } from '../../components/ShareModal.tsx';
 import { TopBar } from '../../components/TopBar.tsx';
 import { Button, IconButton } from '../../components/controls/ui.tsx';
 import { describeDay } from '../../lib/format.ts';
 import { ALL, useJournals } from '../../state/journalsContext.tsx';
+import { useLoggedIn } from '../../state/session.tsx';
 import { todayDate } from '../../lib/repeat.ts';
 import { useColors, type Colors } from '../../theme.ts';
 import { readSetting, saveSetting } from '../../lib/viewSettings.ts';
@@ -84,10 +86,14 @@ export default function JournalScreen() {
     newEntryCalendar,
     openEntry,
   } = useJournals();
+  const { client, config } = useLoggedIn();
   const hasJournals = calendars.length > 0;
+  // Feeds are per journal, so not in the All view.
+  const canShare = config.feed !== undefined;
 
   const [showNotes, setShowNotes] = useState(() => readSetting(SHOW_NOTES_KEY) !== 'false');
   const [refreshing, setRefreshing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   /** The modal for a new entry, with its date (none: a note). */
   const [creating, setCreating] = useState<{ start?: LocalDate } | null>(null);
   const newEntry = () => setCreating({ start: todayDate() });
@@ -212,6 +218,11 @@ export default function JournalScreen() {
             ]}
           />
         )}
+        {canShare && calendar && (
+          <IconButton label="Add to Google Calendar" onPress={() => setSharing(true)}>
+            <ShareIcon color={colors.textSecondary} size={20} />
+          </IconButton>
+        )}
         <IconButton label="New entry" filled size={30} onPress={newEntry}>
           <PlusIcon color={colors.accentText} size={16} />
         </IconButton>
@@ -277,6 +288,15 @@ export default function JournalScreen() {
           initialStart={creating.start}
           onClose={() => setCreating(null)}
           onSave={createEntry}
+        />
+      )}
+      {sharing && calendar && config.feed && (
+        <ShareModal
+          client={client}
+          calendar={calendar}
+          token={config.feed.token}
+          section="journal"
+          onClose={() => setSharing(false)}
         />
       )}
     </SafeAreaView>

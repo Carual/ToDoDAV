@@ -13,15 +13,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Task } from '../../api/tasks.ts';
-import { ChevronDownIcon, FilterIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
+import { ChevronDownIcon, FilterIcon, HashIcon, LayersIcon, PlusIcon, ShareIcon } from '../../components/controls/icons.tsx';
 import { Select } from '../../components/controls/Select.tsx';
 import { FilterModal } from '../../components/tasks/FilterModal.tsx';
 import { SettingsModal } from '../../components/tasks/SettingsModal.tsx';
 import { TaskItem } from '../../components/tasks/TaskItem.tsx';
 import { TaskModal } from '../../components/tasks/TaskModal.tsx';
+import { ShareModal } from '../../components/ShareModal.tsx';
 import { TopBar } from '../../components/TopBar.tsx';
 import { IconButton } from '../../components/controls/ui.tsx';
 import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../../lib/taskRows.ts';
+import { useLoggedIn } from '../../state/session.tsx';
 import { ALL, useTasks } from '../../state/tasksContext.tsx';
 import { useColors, type Colors } from '../../theme.ts';
 import {
@@ -68,7 +70,10 @@ export default function TasksScreen() {
     newTaskCalendar,
     openTask,
   } = useTasks();
+  const { client, config } = useLoggedIn();
   const hasLists = calendars.length > 0;
+  // Feeds are per list, so not in the All view.
+  const canShare = config.feed !== undefined;
 
   const [showCompleted, setShowCompleted] = useState(() => readSetting(SHOW_COMPLETED_KEY) === 'true');
   /** UIDs of the tasks whose sub-tasks are hidden in the list. */
@@ -77,6 +82,7 @@ export default function TasksScreen() {
   const [creating, setCreating] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
   const [editingFilters, setEditingFilters] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   function toggleCollapsed(uid: string) {
     const next = new Set(collapsed);
@@ -232,6 +238,11 @@ export default function TasksScreen() {
               ]}
             />
           )}
+          {canShare && calendar && (
+            <IconButton label="Add to Google Calendar" onPress={() => setSharing(true)}>
+              <ShareIcon color={colors.textSecondary} size={20} />
+            </IconButton>
+          )}
           {/* The same as "+ Add task" under the list, reachable without scrolling past a long one. */}
           <IconButton label="Add task" filled size={30} onPress={() => setCreating(true)}>
             <PlusIcon color={colors.accentText} size={16} />
@@ -307,6 +318,9 @@ export default function TasksScreen() {
           onSave={createTask}
           onToggle={toggleTask}
         />
+      )}
+      {sharing && calendar && config.feed && (
+        <ShareModal client={client} calendar={calendar} token={config.feed.token} onClose={() => setSharing(false)} />
       )}
       {editingSettings && (
         <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setEditingSettings(false)} />
