@@ -1,3 +1,4 @@
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -9,8 +10,39 @@ export interface ToastMessage {
   action?: { label: string; run: () => void };
 }
 
+const ShowToast = createContext<((toast: ToastMessage) => void) | null>(null);
+
+/** Shows a toast over everything inside it for 5 seconds (the next one replaces it). */
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [toast, setToast] = useState<ToastMessage | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  function showToast(next: ToastMessage) {
+    clearTimeout(timer.current);
+    setToast(next);
+    timer.current = setTimeout(() => setToast(null), 5000);
+  }
+
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return (
+    <ShowToast.Provider value={showToast}>
+      <View style={styles.fill}>
+        {children}
+        {toast && <Toast toast={toast} onDismiss={() => setToast(null)} />}
+      </View>
+    </ShowToast.Provider>
+  );
+}
+
+export function useToast() {
+  const showToast = useContext(ShowToast);
+  if (!showToast) throw new Error('useToast must be used inside ToastProvider.');
+  return showToast;
+}
+
 /** The message at the bottom left after a change, with its Undo or Retry. */
-export function Toast({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () => void }) {
+function Toast({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
@@ -37,6 +69,7 @@ export function Toast({ toast, onDismiss }: { toast: ToastMessage; onDismiss: ()
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   toast: {
     position: 'absolute',
     left: 16,

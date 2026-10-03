@@ -1,21 +1,18 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
 import type { Calendar } from '../api/caldav.ts';
 import type { Task, TaskEdits } from '../api/tasks.ts';
-import type { ToastMessage } from '../components/controls/Toast.tsx';
+import { useToast } from '../components/controls/Toast.tsx';
 import type { RootParams } from '../navigation.tsx';
 import { describeDue } from '../lib/format.ts';
+import { useCalendarChoice } from './calendarChoice.ts';
 import { useLoggedIn } from './session.tsx';
 import { plural, taskOrder, type ListView } from '../lib/taskRows.ts';
 import { ancestors, buildTree, descendants, joinTrees, type TaskTree } from '../lib/taskTree.ts';
 import { useTaskList } from './useTaskList.ts';
-import { loadSettings, matchesFilters, readSetting, saveSetting, saveSettings, type ViewSettings } from '../lib/viewSettings.ts';
-
-const SELECTED_KEY = 'tododav.calendar';
-/** The "All" view's value where a list href would go; hrefs start with / or a scheme, so it can't clash. */
-export const ALL = 'all';
+import { loadSettings, matchesFilters, saveSettings, type ViewSettings } from '../lib/viewSettings.ts';
 
 /**
  * Everything about the tasks on screen, shared by the list (/tasks) and the task page (/tasks/<uid>) on top of it,
@@ -24,18 +21,9 @@ export const ALL = 'all';
 function useTasksState() {
   const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();
   const { client, calendars, signOut } = useLoggedIn();
-
-  // "All" only makes sense with several lists, and is where the app starts then, like Todoist's all-projects views.
-  const canShowAll = calendars.length > 1;
-  const [selected, setSelected] = useState(() => {
-    const saved = readSetting(SELECTED_KEY);
-    if (saved === ALL && canShowAll) return ALL;
-    return calendars.find((c) => c.href === saved)?.href ?? (canShowAll ? ALL : calendars[0]?.href);
-  });
-  const allView = selected === ALL;
-  /** The single list on screen; undefined in the "All" view. */
-  const calendar = calendars.find((c) => c.href === selected);
-  const shownHrefs = allView ? calendars.map((c) => c.href) : calendar ? [calendar.href] : [];
+  const choice = useCalendarChoice('tododav.calendar', calendars);
+  const { calendar } = choice;
+  const showToast = useToast();
 
   const [settings, setSettings] = useState(loadSettings);
 
@@ -44,21 +32,10 @@ function useTasksState() {
     saveSettings(next);
   }
 
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  function showToast(next: ToastMessage) {
-    clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), 5000);
-  }
-
-  useEffect(() => () => clearTimeout(toastTimer.current), []);
-
   // Every change shows at once; a failed save puts the task back and says so here.
   const list = useTaskList({
     client,
-    calendarHrefs: shownHrefs,
+    calendarHrefs: choice.shownHrefs,
     onLogout: signOut,
     onWriteError: ({ message, retry }) => showToast({ message, action: retry && { label: 'Retry', run: retry } }),
   });
@@ -132,25 +109,11 @@ function useTasksState() {
     list.create(calendarHref, { summary, description: '', priority: 4, categories: [], location: '' }, parent.uid);
   }
 
-  /** Shows one list, or every list with ALL. */
-  function selectCalendar(href: string) {
-    setSelected(href);
-    saveSetting(SELECTED_KEY, href);
-  }
-
   return {
-    client,
-    calendars,
-    selected,
-    allView,
-    calendar,
-    canShowAll,
-    selectCalendar,
+    ...choice,
     settings,
     changeSettings,
-    toast,
     showToast,
-    dismissToast: () => setToast(null),
     list,
     tree,
     view,

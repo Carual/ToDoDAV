@@ -26,7 +26,7 @@ npm manages the dependencies here too, with this folder's own `package.json` and
 
 ## Rules
 
-- Navigation is React Navigation, declared in one file, `src/navigation.tsx`: every screen, its URL (`linking`) and its options. A new screen goes in `src/screens/` and is added there, with its params in the `*Params` types; file names never make routes (no Expo Router). Everything else: hooks and contexts in `src/state/`, plain helpers in `src/lib/`, CalDAV/iCalendar/Todoist code in `src/api/`, and components in `src/components/` (`tasks/`, `journal/`, or `controls/` for generic UI).
+- Navigation is React Navigation, declared in one file, `src/navigation.tsx`: every screen, its URL (`linking`) and its options. A new screen goes in `src/screens/`, named for what it shows (`Tasks.tsx` exporting `Tasks`, no `Screen` suffix), and is added there, with its params in the `*Params` types; file names never make routes (no Expo Router). Everything else: hooks and contexts in `src/state/`, plain helpers in `src/lib/`, CalDAV/iCalendar/Todoist code in `src/api/`, and components in `src/components/` (`tasks/`, `journal/`, or `controls/` for generic UI).
 - `ios/` and `android/` are generated (Continuous Native Generation) and ignored by git. Never create or edit them; configure native behavior in `app.json` and config plugins.
 - Expo Go only has its own bundled native modules. A library with other native code needs a development build (`npx expo run:android`, or `eas build --profile development`), so prefer Expo's modules.
 - Platform-specific files use `.native.ts` / `.web.ts` (or the plain `.ts` for the web): import them without the extension, so Metro picks the right one. Everything else is imported with its `.ts`/`.tsx` extension, like the rest of the repo.

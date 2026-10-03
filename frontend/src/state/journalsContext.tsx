@@ -1,18 +1,14 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 import type { Calendar } from '../api/caldav.ts';
 import type { Journal, JournalEdits } from '../api/journals.ts';
-import type { ToastMessage } from '../components/controls/Toast.tsx';
+import { useToast } from '../components/controls/Toast.tsx';
 import type { RootParams } from '../navigation.tsx';
+import { useCalendarChoice } from './calendarChoice.ts';
 import { useLoggedIn } from './session.tsx';
 import { useJournalList } from './useJournalList.ts';
-import { readSetting, saveSetting } from '../lib/viewSettings.ts';
-
-const SELECTED_KEY = 'tododav.journalCalendar';
-/** The "All" view's value where a journal href would go; hrefs start with / or a scheme, so it can't clash. */
-export const ALL = 'all';
 
 /**
  * Everything about the journal entries on screen, shared by the Journal page (/journal) and the entry on top of it
@@ -21,41 +17,17 @@ export const ALL = 'all';
 function useJournalsState() {
   const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();
   const { client, journals: calendars, signOut, setJournals } = useLoggedIn();
-
-  const canShowAll = calendars.length > 1;
-  const [selected, setSelected] = useState(() => {
-    const saved = readSetting(SELECTED_KEY);
-    if (saved === ALL && canShowAll) return ALL;
-    return calendars.find((c) => c.href === saved)?.href ?? (canShowAll ? ALL : calendars[0]?.href);
-  });
-  const allView = selected === ALL;
-  /** The single journal on screen; undefined in the "All" view. */
-  const calendar = calendars.find((c) => c.href === selected);
-  const shownHrefs = allView ? calendars.map((c) => c.href) : calendar ? [calendar.href] : [];
-
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  function showToast(next: ToastMessage) {
-    clearTimeout(toastTimer.current);
-    setToast(next);
-    toastTimer.current = setTimeout(() => setToast(null), 5000);
-  }
-
-  useEffect(() => () => clearTimeout(toastTimer.current), []);
+  const choice = useCalendarChoice('tododav.journalCalendar', calendars);
+  const { calendar, selectCalendar } = choice;
+  const showToast = useToast();
 
   const list = useJournalList({
     client,
-    calendarHrefs: shownHrefs,
+    calendarHrefs: choice.shownHrefs,
     onLogout: signOut,
     onWriteError: ({ message, retry }) => showToast({ message, action: retry && { label: 'Retry', run: retry } }),
   });
   const calendarOf = (journal: Journal): Calendar | undefined => calendars.find((c) => c.href === list.listOf(journal));
-
-  function selectCalendar(href: string) {
-    setSelected(href);
-    saveSetting(SELECTED_KEY, href);
-  }
 
   function deleteEntry(journal: Journal) {
     const listHref = list.listOf(journal);
@@ -84,15 +56,8 @@ function useJournalsState() {
   }
 
   return {
-    calendars,
-    selected,
-    allView,
-    calendar,
-    canShowAll,
-    selectCalendar,
-    toast,
+    ...choice,
     showToast,
-    dismissToast: () => setToast(null),
     list,
     calendarOf,
     deleteEntry,

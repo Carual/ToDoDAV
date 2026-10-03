@@ -38,23 +38,26 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     src/leaveGuard.ts, then registers src/App.tsx (safe areas, SessionProvider, splash screen, Navigation)
   metro.config.js   Watches ../shared; the web dev server forwards /proxy, /api and /feed to the backend
   src/navigation.tsx  Every screen, its URL and its options, in one file (React Navigation; file names don't make routes). Without a
-                    session only Login; with one, the Tasks and Journal sections, each a provider, a stack (the page, and the
-                    task or entry over it as a transparentModal) and a toast. A fixed getId keeps one of each section, so the
+                    session only Login; with one, the Tasks and Journal sections, each a provider and a stack (the page, and
+                    the task or entry over it as a transparentModal), all under one ToastProvider. A fixed getId keeps one of each section, so the
                     TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy
-  src/screens/      LoginScreen, TasksScreen, TaskScreen, JournalScreen, EntryScreen
-  src/api/          The CalDAV, iCalendar and Todoist logic copied from frontend-react, plus connect.ts: logIn, and on
-                    Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
+  src/screens/      Login, Tasks, Task, Journal, Entry (no "Screen" suffix: the folder says it)
+  src/api/          The CalDAV and iCalendar logic copied from frontend-react (the Todoist, CSV and .ics import/export files
+                    are copied when that feature arrives), plus connect.ts: logIn, and on Android/iOS which server the typed
+                    address is (ToDoDAV, CalDAV, /.well-known/caldav)
   src/state/        Hooks and contexts: useCalendarObjects, useTaskList, useJournalList; tasksContext (what frontend-react's
                     MainPage held: the list, tree, settings, completing, deleting, shared by both task screens) and
-                    journalsContext (the same for the Journal page); session.tsx (restores the saved login at startup, splash
+                    journalsContext (the same for the Journal page), both on calendarChoice.ts (the calendar on screen or
+                    "All", and following a link to another calendar); session.tsx (restores the saved login at startup, splash
                     screen up meanwhile) and loginStore.ts (sessionStorage on the web, expo-secure-store on Android/iOS)
   src/lib/          Plain helpers: format, repeat, taskTree, viewSettings, taskRows (sorting and nesting the rows, from
                     frontend-react's MainPage), markdown.tsx (inline Markdown as nested <Text>, links through Linking; parser
                     in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet)
-  src/components/   TopBar, LogoMark, ShareModal (the feed link, on both pages), and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
+  src/components/   TopBar, LogoMark, ShareModal (the feed link, on both pages), ListPage (what both pages share: the page
+                    frame and its loading/error states, PageHeader, AddRow, SectionToggle, EmptyState), and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
                     fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField, SettingsModal, FilterModal), journal/
                     (JournalModal, JournalItem) and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, SmallDialog:
-                    the frame of the settings and filters, Popover: a transparent Modal placed by measureInWindow, Toast,
+                    the frame of the settings and filters, Popover: a transparent Modal placed by measureInWindow, Toast and useToast,
                     ui: Button, IconButton, SwitchRow, icons)
                     The logic copied from frontend-react (api/, state/, lib/) is kept identical apart from import paths,
                     except caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)

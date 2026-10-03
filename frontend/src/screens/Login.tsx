@@ -23,7 +23,7 @@ import { useColors, type Colors } from '../theme.ts';
 // The web build is served by the ToDoDAV backend and goes through its /proxy; the apps ask for the server.
 const ASKS_SERVER = Platform.OS !== 'web';
 
-export function LoginScreen() {
+export function Login() {
   const colors = useColors();
   const styles = makeStyles(colors);
   const { signIn, restoreError } = useSession();

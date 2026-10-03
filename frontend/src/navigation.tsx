@@ -7,17 +7,17 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
-import { View, useColorScheme } from 'react-native';
+import { useColorScheme } from 'react-native';
 
-import { Toast } from './components/controls/Toast.tsx';
-import { EntryScreen } from './screens/EntryScreen.tsx';
-import { JournalScreen } from './screens/JournalScreen.tsx';
-import { LoginScreen } from './screens/LoginScreen.tsx';
-import { TaskScreen } from './screens/TaskScreen.tsx';
-import { TasksScreen } from './screens/TasksScreen.tsx';
-import { JournalsProvider, useJournals } from './state/journalsContext.tsx';
+import { ToastProvider } from './components/controls/Toast.tsx';
+import { Entry } from './screens/Entry.tsx';
+import { Journal } from './screens/Journal.tsx';
+import { Login } from './screens/Login.tsx';
+import { Task } from './screens/Task.tsx';
+import { Tasks } from './screens/Tasks.tsx';
+import { JournalsProvider } from './state/journalsContext.tsx';
 import { useSession } from './state/session.tsx';
-import { TasksProvider, useTasks } from './state/tasksContext.tsx';
+import { TasksProvider } from './state/tasksContext.tsx';
 import { useColors } from './theme.ts';
 
 // Every screen of the app, its URL and how it is shown. Nothing depends on file names.
@@ -78,22 +78,23 @@ export function Navigation() {
   const colors = useColors();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: colors.bg, text: colors.text, primary: colors.accent } };
-  const screenOptions: NativeStackNavigationOptions = { headerShown: false, contentStyle: { backgroundColor: colors.bg } };
 
   // Without a session only Login exists, with one only the sections: logging in or out swaps them, and the
-  // navigator shows the first one available.
+  // navigator shows the first one available. The toast (Undo, Retry...) sits over every screen.
   return (
     <NavigationContainer linking={linking} theme={theme} documentTitle={{ enabled: false }}>
-      <Root.Navigator screenOptions={screenOptions}>
-        {session === null ? (
-          <Root.Screen name="Login" component={LoginScreen} />
-        ) : (
-          <>
-            <Root.Screen name="Tasks" component={TasksSection} getId={singular} options={{ animation: 'none' }} />
-            <Root.Screen name="Journal" component={JournalSection} getId={singular} options={{ animation: 'none' }} />
-          </>
-        )}
-      </Root.Navigator>
+      <ToastProvider>
+        <Root.Navigator screenOptions={useScreenOptions()}>
+          {session === null ? (
+            <Root.Screen name="Login" component={Login} />
+          ) : (
+            <>
+              <Root.Screen name="Tasks" component={TasksSection} getId={singular} options={{ animation: 'none' }} />
+              <Root.Screen name="Journal" component={JournalSection} getId={singular} options={{ animation: 'none' }} />
+            </>
+          )}
+        </Root.Navigator>
+      </ToastProvider>
     </NavigationContainer>
   );
 }
@@ -102,22 +103,11 @@ export function Navigation() {
 function TasksSection() {
   return (
     <TasksProvider>
-      <TasksScreens />
-    </TasksProvider>
-  );
-}
-
-function TasksScreens() {
-  const colors = useColors();
-  const { toast, dismissToast } = useTasks();
-  return (
-    <View style={{ flex: 1 }}>
-      <TasksStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <TasksStack.Screen name="TaskList" component={TasksScreen} />
-        <TasksStack.Screen name="Task" component={TaskScreen} options={overList} />
+      <TasksStack.Navigator screenOptions={useScreenOptions()}>
+        <TasksStack.Screen name="TaskList" component={Tasks} />
+        <TasksStack.Screen name="Task" component={Task} options={overList} />
       </TasksStack.Navigator>
-      {toast && <Toast toast={toast} onDismiss={dismissToast} />}
-    </View>
+    </TasksProvider>
   );
 }
 
@@ -125,21 +115,14 @@ function TasksScreens() {
 function JournalSection() {
   return (
     <JournalsProvider>
-      <JournalScreens />
+      <JournalStack.Navigator screenOptions={useScreenOptions()}>
+        <JournalStack.Screen name="EntryList" component={Journal} />
+        <JournalStack.Screen name="Entry" component={Entry} options={overList} />
+      </JournalStack.Navigator>
     </JournalsProvider>
   );
 }
 
-function JournalScreens() {
-  const colors = useColors();
-  const { toast, dismissToast } = useJournals();
-  return (
-    <View style={{ flex: 1 }}>
-      <JournalStack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
-        <JournalStack.Screen name="EntryList" component={JournalScreen} />
-        <JournalStack.Screen name="Entry" component={EntryScreen} options={overList} />
-      </JournalStack.Navigator>
-      {toast && <Toast toast={toast} onDismiss={dismissToast} />}
-    </View>
-  );
+function useScreenOptions(): NativeStackNavigationOptions {
+  return { headerShown: false, contentStyle: { backgroundColor: useColors().bg } };
 }
