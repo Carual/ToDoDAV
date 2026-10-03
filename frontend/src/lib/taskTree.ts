@@ -1,4 +1,4 @@
-import type { Task } from './api/tasks.ts';
+import type { Task } from '../api/tasks.ts';
 
 /** How the tasks of one list nest, following each task's RELATED-TO parent. */
 export interface TaskTree {

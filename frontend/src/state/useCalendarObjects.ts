@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalDavError, type CalDavClient, type Calendar } from './api/caldav.ts';
+import { CalDavError, type CalDavClient, type Calendar } from '../api/caldav.ts';
 
 export interface WriteError {
   message: string;

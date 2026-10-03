@@ -1,4 +1,4 @@
-import type { Task } from './api/tasks.ts';
+import type { Task } from '../api/tasks.ts';
 import type { TaskTree } from './taskTree.ts';
 
 // How the tasks of the lists on screen become rows, as frontend-react's MainPage lists them.

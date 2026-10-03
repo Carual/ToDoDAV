@@ -1,4 +1,4 @@
-import { applyJournalEdits, newJournalIcs, parseJournal, type Journal, type JournalEdits } from './api/journals.ts';
+import { applyJournalEdits, newJournalIcs, parseJournal, type Journal, type JournalEdits } from '../api/journals.ts';
 import { useCalendarObjects, type ListOptions, type ObjectKind } from './useCalendarObjects.ts';
 
 const JOURNALS: ObjectKind<Journal> = {

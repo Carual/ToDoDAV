@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
-import { isSafeHref, parseInline, parseMarkdown, type Block, type Inline } from '../../shared/markdown.ts';
-import { useColors, type Colors } from './theme.ts';
+import { isSafeHref, parseInline, parseMarkdown, type Block, type Inline } from '../../../shared/markdown.ts';
+import { useColors, type Colors } from '../theme.ts';
 
-export { hasMarkdown, plainText, previewLine } from '../../shared/markdown.ts';
+export { hasMarkdown, plainText, previewLine } from '../../../shared/markdown.ts';
 
 // Markdown rendered as nested <Text> elements, never as HTML: whatever another app wrote in a task can't inject
 // markup. Only http(s), mailto and obsidian links open (isSafeHref), each in its own app.

@@ -1,5 +1,5 @@
 import ICAL from 'ical.js';
-import type { LocalDate } from './api/tasks.ts';
+import type { LocalDate } from '../api/tasks.ts';
 import { describeRepeat, ordinal } from './format.ts';
 
 // Repeats as the task modal offers them: Google Calendar's choices (every day, every weekday, weekly on the

@@ -1,8 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { describeDue, type DueTone } from '../format.ts';
-import { useColors, type Colors } from '../theme.ts';
+import { describeDue, type DueTone } from '../../lib/format.ts';
+import { useColors, type Colors } from '../../theme.ts';
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -14,7 +14,7 @@ import {
   WeekendIcon,
 } from './icons.tsx';
 import { Popover } from './Popover.tsx';
-import { dueColor } from './TaskItem.tsx';
+import { dueColor } from '../tasks/TaskItem.tsx';
 import { IconButton } from './ui.tsx';
 
 interface Props {

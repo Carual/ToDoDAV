@@ -2,7 +2,7 @@ import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react
 import { Modal, Pressable, StyleSheet, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 
 interface Props {
   /** The control it opens from: it is placed under it (above when there is more room there). */

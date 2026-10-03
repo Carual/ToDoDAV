@@ -7,7 +7,7 @@ import {
   withNextOccurrence,
   type Task,
   type TaskEdits,
-} from './api/tasks.ts';
+} from '../api/tasks.ts';
 import { useCalendarObjects, type ListOptions, type ObjectKind } from './useCalendarObjects.ts';
 
 export type { WriteError } from './useCalendarObjects.ts';

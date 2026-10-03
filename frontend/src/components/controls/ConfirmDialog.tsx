@@ -1,6 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 import { Button } from './ui.tsx';
 
 interface Props {

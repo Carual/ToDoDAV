@@ -16,8 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Transport } from '../api/caldav.ts';
 import { connect, logIn, normalizeServerUrl } from '../api/connect.ts';
 import { LogoMark } from '../components/LogoMark.tsx';
-import { readLastLogin, writeLastLogin } from '../loginStore.ts';
-import { useSession } from '../session.tsx';
+import { readLastLogin, writeLastLogin } from '../state/loginStore.ts';
+import { useSession } from '../state/session.tsx';
 import { useColors, type Colors } from '../theme.ts';
 
 // The web build is served by the ToDoDAV backend and goes through its /proxy; the apps ask for the server.

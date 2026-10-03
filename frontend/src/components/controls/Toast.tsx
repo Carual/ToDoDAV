@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 
 export interface ToastMessage {
   message: string;

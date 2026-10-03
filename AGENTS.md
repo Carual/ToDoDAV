@@ -40,21 +40,23 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     Stack, toast), index (the page) and [uid] (the modal over it, a transparentModal screen). The root _layout
                     guards them with Stack.Protected and marks them dangerouslySingular, so the TopBar's Tasks | Journal tabs
                     bring the other page back as it was left instead of stacking a new copy
-  src/tasksContext.tsx  What frontend-react's MainPage held (useTaskList, tree, settings, completing, deleting), shared by both screens
-  src/journalsContext.tsx  The same for the Journal page (useJournalList, deleting with Undo, creating a first journal)
-  src/components/   TaskModal and JournalModal on modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView,
-                    sidebar fields), TaskItem, JournalItem, TopBar, DatePicker, TimeField, RepeatField, Select, Menu, ConfirmDialog,
-                    Popover (a transparent Modal placed by measureInWindow), Toast, ui (Button, IconButton, SwitchRow), icons
+  src/api/          The CalDAV, iCalendar and Todoist logic copied from frontend-react, plus connect.ts: logIn, and on
+                    Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
+  src/state/        Hooks and contexts: useCalendarObjects, useTaskList, useJournalList; tasksContext (what frontend-react's
+                    MainPage held: the list, tree, settings, completing, deleting, shared by both task screens) and
+                    journalsContext (the same for the Journal page); session.tsx (restores the saved login at startup, splash
+                    screen up meanwhile) and loginStore.ts (sessionStorage on the web, expo-secure-store on Android/iOS)
+  src/lib/          Plain helpers: format, repeat, taskTree, viewSettings, taskRows (sorting and nesting the rows, from
+                    frontend-react's MainPage), markdown.tsx (inline Markdown as nested <Text>, links through Linking; parser
+                    in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet)
+  src/components/   TopBar, LogoMark, and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
+                    fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField), journal/ (JournalModal, JournalItem)
+                    and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, Popover: a transparent Modal placed by
+                    measureInWindow, Toast, ui: Button, IconButton, SwitchRow, icons)
+                    The logic copied from frontend-react (api/, state/, lib/) is kept identical apart from import paths,
+                    except caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)
   src/leaveGuard.ts On the web, a popstate listener loaded before the router, so the task modal can ask before Back/Forward
-  src/download.ts   Saving a file: a Blob link on the web, download.native.ts hands it to the share sheet (expo-sharing)
-  src/taskRows.ts   Sorting and nesting the rows (from frontend-react's MainPage)
-  src/markdown.tsx  Inline Markdown as nested <Text>, links through Linking (parser in shared/)
-  src/api/, src/*.ts  The platform-neutral logic copied from frontend-react (tasks, journals, ical, useCalendarObjects...), kept
-                    identical except: caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)
-  src/api/connect.ts  logIn, and on Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
-  src/session.tsx     The session context: restores the saved login at startup (splash screen up meanwhile)
-  src/loginStore.ts   The saved login: sessionStorage on the web, expo-secure-store (Keystore/Keychain) on Android/iOS
-  src/theme.ts        The colors of frontend-react's styles.css, light and dark
+  src/theme.ts      The colors of frontend-react's styles.css, light and dark
 shared/
   markdown.ts     Markdown parser (plain TypeScript): the app renders it, the feed turns it into plain text or HTML
 frontend-react/

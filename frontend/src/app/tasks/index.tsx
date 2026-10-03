@@ -13,16 +13,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Task } from '../../api/tasks.ts';
-import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/icons.tsx';
-import { Select } from '../../components/Select.tsx';
-import { TaskItem } from '../../components/TaskItem.tsx';
-import { TaskModal } from '../../components/TaskModal.tsx';
+import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
+import { Select } from '../../components/controls/Select.tsx';
+import { TaskItem } from '../../components/tasks/TaskItem.tsx';
+import { TaskModal } from '../../components/tasks/TaskModal.tsx';
 import { TopBar } from '../../components/TopBar.tsx';
-import { IconButton } from '../../components/ui.tsx';
-import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../../taskRows.ts';
-import { ALL, useTasks } from '../../tasksContext.tsx';
+import { IconButton } from '../../components/controls/ui.tsx';
+import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../../lib/taskRows.ts';
+import { ALL, useTasks } from '../../state/tasksContext.tsx';
 import { useColors, type Colors } from '../../theme.ts';
-import { DEFAULT_SETTINGS, describeFilters, filtersActive, readSetting, saveSetting } from '../../viewSettings.ts';
+import { DEFAULT_SETTINGS, describeFilters, filtersActive, readSetting, saveSetting } from '../../lib/viewSettings.ts';
 
 const SHOW_COMPLETED_KEY = 'tododav.showCompleted';
 /** Below this width the layout is the phone one: narrower margins and indents. */

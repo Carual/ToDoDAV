@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { LocalDate } from '../api/tasks.ts';
-import { describeRepeat } from '../format.ts';
+import type { LocalDate } from '../../api/tasks.ts';
+import { describeRepeat } from '../../lib/format.ts';
 import {
   defaultForm,
   formToRule,
@@ -13,11 +13,11 @@ import {
   WEEK,
   type Frequency,
   type RepeatForm,
-} from '../repeat.ts';
-import { useColors } from '../theme.ts';
-import { DatePicker } from './DatePicker.tsx';
-import { Select, type SelectOption } from './Select.tsx';
-import { SwitchRow } from './ui.tsx';
+} from '../../lib/repeat.ts';
+import { useColors } from '../../theme.ts';
+import { DatePicker } from '../controls/DatePicker.tsx';
+import { Select, type SelectOption } from '../controls/Select.tsx';
+import { SwitchRow } from '../controls/ui.tsx';
 
 interface Props {
   /** The RRULE value, or undefined when the task doesn't repeat. */

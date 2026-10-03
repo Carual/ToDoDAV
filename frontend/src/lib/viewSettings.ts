@@ -1,4 +1,4 @@
-import type { Priority, Task } from './api/tasks.ts';
+import type { Priority, Task } from '../api/tasks.ts';
 import { describeDue } from './format.ts';
 
 export function readSetting(key: string): string | null {

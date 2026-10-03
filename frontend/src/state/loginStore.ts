@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-import type { Credentials, Transport } from './api/caldav.ts';
+import type { Credentials, Transport } from '../api/caldav.ts';
 
 export interface StoredLogin extends Credentials {
   transport: Transport;

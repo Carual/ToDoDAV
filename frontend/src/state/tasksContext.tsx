@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
-import type { Calendar } from './api/caldav.ts';
-import type { Task, TaskEdits } from './api/tasks.ts';
-import type { ToastMessage } from './components/Toast.tsx';
-import { describeDue } from './format.ts';
+import type { Calendar } from '../api/caldav.ts';
+import type { Task, TaskEdits } from '../api/tasks.ts';
+import type { ToastMessage } from '../components/controls/Toast.tsx';
+import { describeDue } from '../lib/format.ts';
 import { useLoggedIn } from './session.tsx';
-import { plural, taskOrder, type ListView } from './taskRows.ts';
-import { ancestors, buildTree, descendants, joinTrees, type TaskTree } from './taskTree.ts';
+import { plural, taskOrder, type ListView } from '../lib/taskRows.ts';
+import { ancestors, buildTree, descendants, joinTrees, type TaskTree } from '../lib/taskTree.ts';
 import { useTaskList } from './useTaskList.ts';
-import { loadSettings, matchesFilters, readSetting, saveSetting, saveSettings, type ViewSettings } from './viewSettings.ts';
+import { loadSettings, matchesFilters, readSetting, saveSetting, saveSettings, type ViewSettings } from '../lib/viewSettings.ts';
 
 const SELECTED_KEY = 'tododav.calendar';
 /** The "All" view's value where a list href would go; hrefs start with / or a scheme, so it can't clash. */

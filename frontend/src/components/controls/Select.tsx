@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 import { CheckIcon, ChevronDownIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 

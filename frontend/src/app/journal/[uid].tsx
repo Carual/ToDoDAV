@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
-import { JournalModal } from '../../components/JournalModal.tsx';
-import { useJournals } from '../../journalsContext.tsx';
+import { JournalModal } from '../../components/journal/JournalModal.tsx';
+import { useJournals } from '../../state/journalsContext.tsx';
 
 /** /journal/<uid>: the entry's modal over the Journal page. */
 export default function EntryScreen() {

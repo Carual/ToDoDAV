@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Calendar } from '../api/caldav.ts';
-import type { Task } from '../api/tasks.ts';
-import { describeDue, describeRepeat, type DueTone } from '../format.ts';
-import { InlineMarkdown, previewLine } from '../markdown.tsx';
-import { useColors, type Colors } from '../theme.ts';
-import { BLOCK_FIELDS, type RowField } from '../viewSettings.ts';
-import { CalendarIcon, CheckIcon, ChevronDownIcon, HashIcon, MapPinIcon, RepeatIcon, SubtaskIcon, TagIcon } from './icons.tsx';
+import type { Calendar } from '../../api/caldav.ts';
+import type { Task } from '../../api/tasks.ts';
+import { describeDue, describeRepeat, type DueTone } from '../../lib/format.ts';
+import { InlineMarkdown, previewLine } from '../../lib/markdown.tsx';
+import { useColors, type Colors } from '../../theme.ts';
+import { BLOCK_FIELDS, type RowField } from '../../lib/viewSettings.ts';
+import { CalendarIcon, CheckIcon, ChevronDownIcon, HashIcon, MapPinIcon, RepeatIcon, SubtaskIcon, TagIcon } from '../controls/icons.tsx';
 
 interface Props {
   task: Task;

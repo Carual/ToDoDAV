@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 import { MoreIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 import { IconButton } from './ui.tsx';

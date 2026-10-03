@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 
-import { Toast } from '../../components/Toast.tsx';
-import { TasksProvider, useTasks } from '../../tasksContext.tsx';
+import { Toast } from '../../components/controls/Toast.tsx';
+import { TasksProvider, useTasks } from '../../state/tasksContext.tsx';
 import { useColors } from '../../theme.ts';
 
 // A task link opened directly (/tasks/<uid>) still gets the list under it, for the backdrop and for closing.

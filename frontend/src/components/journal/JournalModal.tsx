@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 
-import type { Calendar } from '../api/caldav.ts';
-import { sameDate, type LocalDate } from '../api/ical.ts';
-import type { Journal, JournalEdits, JournalStatus } from '../api/journals.ts';
+import type { Calendar } from '../../api/caldav.ts';
+import { sameDate, type LocalDate } from '../../api/ical.ts';
+import type { Journal, JournalEdits, JournalStatus } from '../../api/journals.ts';
 // No extension: the bundler picks download.native.ts on Android/iOS.
-import { download } from '../download';
-import { fileName } from '../fileName.ts';
-import { describeRepeat } from '../format.ts';
-import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../markdown.tsx';
-import { useColors } from '../theme.ts';
-import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { DownloadIcon, RepeatIcon, TrashIcon } from './icons.tsx';
-import type { MenuItem } from './Menu.tsx';
+import { download } from '../../lib/download';
+import { fileName } from '../../lib/fileName.ts';
+import { describeRepeat } from '../../lib/format.ts';
+import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../../lib/markdown.tsx';
+import { useColors } from '../../theme.ts';
+import { ConfirmDialog } from '../controls/ConfirmDialog.tsx';
+import { DownloadIcon, RepeatIcon, TrashIcon } from '../controls/icons.tsx';
+import type { MenuItem } from '../controls/Menu.tsx';
 import {
   CalendarField,
   DateField,
@@ -29,9 +29,9 @@ import {
   useLeavePrompt,
   useModalStyles,
   type Guard,
-} from './modalParts.tsx';
-import { Select } from './Select.tsx';
-import { SwitchRow } from './ui.tsx';
+} from '../modalParts.tsx';
+import { Select } from '../controls/Select.tsx';
+import { SwitchRow } from '../controls/ui.tsx';
 
 interface Props {
   /** The entry to show and edit; absent when adding a new one. */

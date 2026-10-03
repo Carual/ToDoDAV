@@ -14,17 +14,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { LocalDate } from '../../api/ical.ts';
 import type { Journal } from '../../api/journals.ts';
-import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/icons.tsx';
-import { JournalItem } from '../../components/JournalItem.tsx';
-import { JournalModal } from '../../components/JournalModal.tsx';
-import { Select } from '../../components/Select.tsx';
+import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon } from '../../components/controls/icons.tsx';
+import { JournalItem } from '../../components/journal/JournalItem.tsx';
+import { JournalModal } from '../../components/journal/JournalModal.tsx';
+import { Select } from '../../components/controls/Select.tsx';
 import { TopBar } from '../../components/TopBar.tsx';
-import { Button, IconButton } from '../../components/ui.tsx';
-import { describeDay } from '../../format.ts';
-import { ALL, useJournals } from '../../journalsContext.tsx';
-import { todayDate } from '../../repeat.ts';
+import { Button, IconButton } from '../../components/controls/ui.tsx';
+import { describeDay } from '../../lib/format.ts';
+import { ALL, useJournals } from '../../state/journalsContext.tsx';
+import { todayDate } from '../../lib/repeat.ts';
 import { useColors, type Colors } from '../../theme.ts';
-import { readSetting, saveSetting } from '../../viewSettings.ts';
+import { readSetting, saveSetting } from '../../lib/viewSettings.ts';
 
 const SHOW_NOTES_KEY = 'tododav.showNotes';
 /** Below this width the layout is the phone one: narrower margins and time column. */

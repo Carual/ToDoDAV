@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { formatTime } from '../format.ts';
-import { useColors } from '../theme.ts';
+import { formatTime } from '../../lib/format.ts';
+import { useColors } from '../../theme.ts';
 import { ClockIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 

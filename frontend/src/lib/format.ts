@@ -1,5 +1,5 @@
 import ICAL from 'ical.js';
-import type { LocalDate } from './api/tasks.ts';
+import type { LocalDate } from '../api/tasks.ts';
 
 export type DueTone = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later';
 

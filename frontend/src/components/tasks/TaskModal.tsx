@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import type { Calendar } from '../api/caldav.ts';
-import { sameDate, type LocalDate } from '../api/ical.ts';
-import type { Priority, Task, TaskEdits } from '../api/tasks.ts';
+import type { Calendar } from '../../api/caldav.ts';
+import { sameDate, type LocalDate } from '../../api/ical.ts';
+import type { Priority, Task, TaskEdits } from '../../api/tasks.ts';
 // No extension: the bundler picks download.native.ts on Android/iOS.
-import { download } from '../download';
-import { fileName } from '../fileName.ts';
-import { describeDue } from '../format.ts';
-import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../markdown.tsx';
-import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../repeat.ts';
-import { useColors, type Colors } from '../theme.ts';
-import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { CheckIcon, DownloadIcon, FlagIcon, PlusIcon, RepeatIcon, TrashIcon } from './icons.tsx';
-import type { MenuItem } from './Menu.tsx';
+import { download } from '../../lib/download';
+import { fileName } from '../../lib/fileName.ts';
+import { describeDue } from '../../lib/format.ts';
+import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../../lib/markdown.tsx';
+import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../../lib/repeat.ts';
+import { useColors, type Colors } from '../../theme.ts';
+import { ConfirmDialog } from '../controls/ConfirmDialog.tsx';
+import { CheckIcon, DownloadIcon, FlagIcon, PlusIcon, RepeatIcon, TrashIcon } from '../controls/icons.tsx';
+import type { MenuItem } from '../controls/Menu.tsx';
 import {
   CalendarField,
   DateField,
@@ -30,10 +30,10 @@ import {
   useLeavePrompt,
   useModalStyles,
   type Guard,
-} from './modalParts.tsx';
+} from '../modalParts.tsx';
 import { RepeatField } from './RepeatField.tsx';
 import { dueColor, priorityColor, TaskCheckbox } from './TaskItem.tsx';
-import { Button, SwitchRow } from './ui.tsx';
+import { Button, SwitchRow } from '../controls/ui.tsx';
 
 interface Props {
   /** The task to show and edit; absent when adding a new one. */

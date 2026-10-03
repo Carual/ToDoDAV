@@ -18,17 +18,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Calendar } from '../api/caldav.ts';
 import type { LocalDate } from '../api/ical.ts';
-import { describeDue, formatDateTime } from '../format.ts';
+import { describeDue, formatDateTime } from '../lib/format.ts';
 import { setLeaveGuard } from '../leaveGuard.ts';
-import { todayDate } from '../repeat.ts';
+import { todayDate } from '../lib/repeat.ts';
 import { useColors, type Colors } from '../theme.ts';
-import { ConfirmDialog } from './ConfirmDialog.tsx';
-import { DatePicker } from './DatePicker.tsx';
-import { CloseIcon, HashIcon, MapPinIcon, PencilIcon } from './icons.tsx';
-import { Menu, type MenuItem } from './Menu.tsx';
-import { Select } from './Select.tsx';
-import { TimeField } from './TimeField.tsx';
-import { Button, IconButton } from './ui.tsx';
+import { ConfirmDialog } from './controls/ConfirmDialog.tsx';
+import { DatePicker } from './controls/DatePicker.tsx';
+import { CloseIcon, HashIcon, MapPinIcon, PencilIcon } from './controls/icons.tsx';
+import { Menu, type MenuItem } from './controls/Menu.tsx';
+import { Select } from './controls/Select.tsx';
+import { TimeField } from './controls/TimeField.tsx';
+import { Button, IconButton } from './controls/ui.tsx';
 
 // What the task modal and the journal modal share, as frontend-react's modalParts.tsx.
 

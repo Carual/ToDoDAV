@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
-import { SessionProvider, useSession } from '../session.tsx';
+import { SessionProvider, useSession } from '../state/session.tsx';
 import { useColors } from '../theme.ts';
 
 // The native splash screen stays up while the saved login is tried, so the login screen never flashes by.

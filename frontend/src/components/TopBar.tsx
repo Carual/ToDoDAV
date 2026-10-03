@@ -2,7 +2,7 @@ import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useLoggedIn } from '../session.tsx';
+import { useLoggedIn } from '../state/session.tsx';
 import { useColors, type Colors } from '../theme.ts';
 import { LogoMark } from './LogoMark.tsx';
 

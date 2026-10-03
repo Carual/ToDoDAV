@@ -1,5 +1,5 @@
 import type ICAL from 'ical.js';
-import { ordinal } from '../format.ts';
+import { ordinal } from '../lib/format.ts';
 import type { LocalDate } from './tasks.ts';
 
 /** A Todoist date as a task has it: the (next) due date, and an RRULE value when it repeats. */

@@ -1,7 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import { Pressable, Switch, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { useColors } from '../theme.ts';
+import { useColors } from '../../theme.ts';
 
 // Small building blocks shared by the screens: the app's buttons and switches.
 

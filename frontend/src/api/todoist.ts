@@ -1,5 +1,5 @@
 import ICAL from 'ical.js';
-import { buildTree } from '../taskTree.ts';
+import { buildTree } from '../lib/taskTree.ts';
 import { parseCsv, toCsv } from './csv.ts';
 import type { ImportItem, ParsedImport } from './icsFile.ts';
 import { newTaskIcs, type LocalDate, type Priority, type Task, type TaskEdits } from './tasks.ts';

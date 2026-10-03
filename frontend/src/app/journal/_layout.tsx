@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
 import { View } from 'react-native';
 
-import { Toast } from '../../components/Toast.tsx';
-import { JournalsProvider, useJournals } from '../../journalsContext.tsx';
+import { Toast } from '../../components/controls/Toast.tsx';
+import { JournalsProvider, useJournals } from '../../state/journalsContext.tsx';
 import { useColors } from '../../theme.ts';
 
 // An entry link opened directly (/journal/<uid>) still gets the Journal page under it, as for tasks.

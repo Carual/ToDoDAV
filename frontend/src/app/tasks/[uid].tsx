@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
-import { TaskModal } from '../../components/TaskModal.tsx';
-import { sortedChildren } from '../../taskRows.ts';
-import { descendants } from '../../taskTree.ts';
-import { useTasks } from '../../tasksContext.tsx';
+import { TaskModal } from '../../components/tasks/TaskModal.tsx';
+import { sortedChildren } from '../../lib/taskRows.ts';
+import { descendants } from '../../lib/taskTree.ts';
+import { useTasks } from '../../state/tasksContext.tsx';
 
 /** /tasks/<uid>: the task's modal over the list. */
 export default function TaskScreen() {

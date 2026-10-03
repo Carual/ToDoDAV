@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { CalDavError, type Calendar } from './api/caldav.ts';
-import { logIn, type Session } from './api/connect.ts';
+import { CalDavError, type Calendar } from '../api/caldav.ts';
+import { logIn, type Session } from '../api/connect.ts';
 import { readLogin, writeLogin, type StoredLogin } from './loginStore.ts';
 
 interface SessionContextValue {

@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-import type { Calendar } from './api/caldav.ts';
-import type { Journal, JournalEdits } from './api/journals.ts';
-import type { ToastMessage } from './components/Toast.tsx';
+import type { Calendar } from '../api/caldav.ts';
+import type { Journal, JournalEdits } from '../api/journals.ts';
+import type { ToastMessage } from '../components/controls/Toast.tsx';
 import { useLoggedIn } from './session.tsx';
 import { useJournalList } from './useJournalList.ts';
-import { readSetting, saveSetting } from './viewSettings.ts';
+import { readSetting, saveSetting } from '../lib/viewSettings.ts';
 
 const SELECTED_KEY = 'tododav.journalCalendar';
 /** The "All" view's value where a journal href would go; hrefs start with / or a scheme, so it can't clash. */

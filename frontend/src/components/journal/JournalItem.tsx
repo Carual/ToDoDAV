@@ -1,11 +1,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { Calendar } from '../api/caldav.ts';
-import type { Journal } from '../api/journals.ts';
-import { describeRepeat, formatTime } from '../format.ts';
-import { InlineMarkdown, previewLine } from '../markdown.tsx';
-import { useColors, type Colors } from '../theme.ts';
-import { HashIcon, MapPinIcon, RepeatIcon, TagIcon } from './icons.tsx';
+import type { Calendar } from '../../api/caldav.ts';
+import type { Journal } from '../../api/journals.ts';
+import { describeRepeat, formatTime } from '../../lib/format.ts';
+import { InlineMarkdown, previewLine } from '../../lib/markdown.tsx';
+import { useColors, type Colors } from '../../theme.ts';
+import { HashIcon, MapPinIcon, RepeatIcon, TagIcon } from '../controls/icons.tsx';
 
 interface Props {
   journal: Journal;
