@@ -1,12 +1,15 @@
 import {
+  createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
+  getStateFromPath,
   NavigationContainer,
   type LinkingOptions,
   type NavigatorScreenParams,
 } from '@react-navigation/native';
 import { createNativeStackNavigator, type NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import * as Linking from 'expo-linking';
+import { useEffect, useMemo, useRef } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { ToastProvider } from './components/controls/Toast.tsx';
@@ -58,6 +61,11 @@ const linking: LinkingOptions<RootParams> = {
   },
 };
 
+/** A path into the app (a task, an entry, a list), as opposed to /login or one the app doesn't know. */
+const APP_PATH = /^\/?(tasks|journal)(\/|\?|$)/;
+
+const navigationRef = createNavigationContainerRef<RootParams>();
+
 const Root = createNativeStackNavigator<RootParams>();
 const TasksStack = createNativeStackNavigator<TasksParams>();
 const JournalStack = createNativeStackNavigator<JournalParams>();
@@ -79,10 +87,36 @@ export function Navigation() {
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = { ...base, colors: { ...base.colors, background: colors.bg, text: colors.text, primary: colors.accent } };
 
+  // A link opened without a session (at startup, or while the login screen is up) can only show Login. It is kept
+  // and followed after logging in, as frontend-react did, so a task link from a calendar still reaches the task.
+  // getStateFromPath sees every link with its prefix already removed, on the web and on Android/iOS alike.
+  const signedIn = useRef(session !== null);
+  signedIn.current = session !== null;
+  const pendingPath = useRef<string | null>(null);
+  const withPendingLinks = useMemo<LinkingOptions<RootParams>>(
+    () => ({
+      ...linking,
+      getStateFromPath: (path, options) => {
+        if (!signedIn.current && APP_PATH.test(path)) pendingPath.current = path;
+        return getStateFromPath(path, options);
+      },
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    const path = pendingPath.current;
+    if (session === null || path === null) return;
+    pendingPath.current = null;
+    // Runs after the navigator has swapped Login for the sections, so the link's screens exist.
+    const state = getStateFromPath(path, linking.config);
+    if (state) navigationRef.resetRoot(state);
+  }, [session]);
+
   // Without a session only Login exists, with one only the sections: logging in or out swaps them, and the
   // navigator shows the first one available. The toast (Undo, Retry...) sits over every screen.
   return (
-    <NavigationContainer linking={linking} theme={theme} documentTitle={{ enabled: false }}>
+    <NavigationContainer ref={navigationRef} linking={withPendingLinks} theme={theme} documentTitle={{ enabled: false }}>
       <ToastProvider>
         <Root.Navigator screenOptions={useScreenOptions()}>
           {session === null ? (

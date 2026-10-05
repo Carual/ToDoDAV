@@ -40,7 +40,9 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
   src/navigation.tsx  Every screen, its URL and its options, in one file (React Navigation; file names don't make routes). Without a
                     session only Login; with one, the Tasks and Journal sections, each a provider and a stack (the page, and
                     the task or entry over it as a transparentModal), all under one ToastProvider. A fixed getId keeps one of each section, so the
-                    TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy
+                    TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy.
+                    A /tasks... or /journal... link opened without a session is kept (a getStateFromPath wrapper) and
+                    followed after logging in
   src/screens/      Login, Tasks, Task, Journal, Entry (no "Screen" suffix: the folder says it)
   src/api/          The CalDAV, iCalendar, import/export and Todoist logic copied from frontend-react, plus connect.ts: logIn,
                     and on Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
