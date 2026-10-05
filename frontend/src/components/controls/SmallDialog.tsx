@@ -13,12 +13,17 @@ interface Props {
   onClose: () => void;
   /** A link at the left of the footer ("Reset to defaults", "Clear filters"). */
   footerAction?: { label: string; onPress: () => void; disabled?: boolean };
+  /** Every way out is refused meanwhile (an import running, whose outcome closing would hide). */
+  closeDisabled?: boolean;
   children: ReactNode;
 }
 
 /** A small dialog whose changes apply at once (settings, filters), closed with Done, ×, the backdrop or Back. */
-export function SmallDialog({ label, icon, onClose, footerAction, children }: Props) {
+export function SmallDialog({ label, icon, onClose: close, footerAction, closeDisabled = false, children }: Props) {
   const colors = useColors();
+  const onClose = () => {
+    if (!closeDisabled) close();
+  };
   const styles = makeStyles(colors);
   const insets = useSafeAreaInsets();
   return (
@@ -34,7 +39,7 @@ export function SmallDialog({ label, icon, onClose, footerAction, children }: Pr
                 {label}
               </Text>
             </View>
-            <IconButton label="Close" onPress={onClose}>
+            <IconButton label="Close" disabled={closeDisabled} onPress={onClose}>
               <CloseIcon color={colors.textSecondary} />
             </IconButton>
           </View>
@@ -55,7 +60,7 @@ export function SmallDialog({ label, icon, onClose, footerAction, children }: Pr
               </Pressable>
             )}
             <View style={styles.spacer} />
-            <Button label="Done" variant="primary" onPress={onClose} />
+            <Button label="Done" variant="primary" disabled={closeDisabled} onPress={onClose} />
           </View>
         </View>
       </View>

@@ -7,11 +7,13 @@ import { IconButton } from '../components/controls/ui.tsx';
 import { AddRow, EmptyState, ListPage, PageHeader, SectionToggle, useFoldSetting } from '../components/ListPage.tsx';
 import { ShareModal } from '../components/ShareModal.tsx';
 import { FilterModal } from '../components/tasks/FilterModal.tsx';
+import { ImportExportModal } from '../components/tasks/ImportExportModal.tsx';
 import { SettingsModal } from '../components/tasks/SettingsModal.tsx';
 import { TaskItem } from '../components/tasks/TaskItem.tsx';
 import { TaskModal } from '../components/tasks/TaskModal.tsx';
 import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../lib/taskRows.ts';
 import { DEFAULT_SETTINGS, describeFilters, filtersActive, type Filters } from '../lib/viewSettings.ts';
+import { ALL } from '../state/calendarChoice.ts';
 import { useLoggedIn } from '../state/session.tsx';
 import { useTasks } from '../state/tasksContext.tsx';
 import { useColors, type Colors } from '../theme.ts';
@@ -33,7 +35,7 @@ export function Tasks() {
   const narrow = useWindowDimensions().width < NARROW;
   const tasks = useTasks();
   const { calendars, allView, calendar, settings, changeSettings, list, tree, view, calendarOf, toggleTask, openTask } = tasks;
-  const { client, config } = useLoggedIn();
+  const { client, config, setCalendars } = useLoggedIn();
   const hasLists = calendars.length > 0;
 
   const [showCompleted, toggleShowCompleted] = useFoldSetting('tododav.showCompleted', false);
@@ -43,6 +45,7 @@ export function Tasks() {
   const [editingSettings, setEditingSettings] = useState(false);
   const [editingFilters, setEditingFilters] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [transferring, setTransferring] = useState(false);
 
   function toggleCollapsed(uid: string) {
     const next = new Set(collapsed);
@@ -185,7 +188,34 @@ export function Tasks() {
         <ShareModal client={client} calendar={calendar} token={config.feed.token} onClose={() => setSharing(false)} />
       )}
       {editingSettings && (
-        <SettingsModal settings={settings} onChange={changeSettings} onClose={() => setEditingSettings(false)} />
+        <SettingsModal
+          settings={settings}
+          onChange={changeSettings}
+          onImportExport={
+            hasLists
+              ? () => {
+                  setEditingSettings(false);
+                  setTransferring(true);
+                }
+              : undefined
+          }
+          onClose={() => setEditingSettings(false)}
+        />
+      )}
+      {transferring && tasks.newTaskCalendar && (
+        <ImportExportModal
+          client={client}
+          calendars={calendars}
+          calendarHref={tasks.newTaskCalendar.href}
+          compare={view.compare}
+          onImported={(hrefs) => {
+            for (const href of hrefs) list.refresh(href);
+            // The "All" view already shows the lists imported into; several lists are best seen there too.
+            if (!allView) tasks.selectCalendar(hrefs.length === 1 ? hrefs[0]! : ALL);
+          }}
+          onListsCreated={(created) => setCalendars([...calendars, ...created])}
+          onClose={() => setTransferring(false)}
+        />
       )}
       {editingFilters && (
         <FilterModal filters={filters} labels={labels} onChange={changeFilters} onClose={() => setEditingFilters(false)} />

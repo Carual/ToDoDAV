@@ -42,9 +42,8 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     the task or entry over it as a transparentModal), all under one ToastProvider. A fixed getId keeps one of each section, so the
                     TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy
   src/screens/      Login, Tasks, Task, Journal, Entry (no "Screen" suffix: the folder says it)
-  src/api/          The CalDAV and iCalendar logic copied from frontend-react (the Todoist, CSV and .ics import/export files
-                    are copied when that feature arrives), plus connect.ts: logIn, and on Android/iOS which server the typed
-                    address is (ToDoDAV, CalDAV, /.well-known/caldav)
+  src/api/          The CalDAV, iCalendar, import/export and Todoist logic copied from frontend-react, plus connect.ts: logIn,
+                    and on Android/iOS which server the typed address is (ToDoDAV, CalDAV, /.well-known/caldav)
   src/state/        Hooks and contexts: useCalendarObjects, useTaskList, useJournalList; tasksContext (what frontend-react's
                     MainPage held: the list, tree, settings, completing, deleting, shared by both task screens) and
                     journalsContext (the same for the Journal page), both on calendarChoice.ts (the calendar on screen or
@@ -52,13 +51,15 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     screen up meanwhile) and loginStore.ts (sessionStorage on the web, expo-secure-store on Android/iOS)
   src/lib/          Plain helpers: format, repeat, taskTree, viewSettings, taskRows (sorting and nesting the rows, from
                     frontend-react's MainPage), markdown.tsx (inline Markdown as nested <Text>, links through Linking; parser
-                    in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet)
+                    in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet),
+                    pickFile.ts (a file read as text, for imports: expo-document-picker, read with expo-file-system on Android/iOS)
   src/components/   TopBar, LogoMark, ShareModal (the feed link, on both pages), ListPage (what both pages share: the page
                     frame and its loading/error states, PageHeader, AddRow, SectionToggle, EmptyState), and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
                     fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField, SettingsModal, FilterModal,
+                    ImportExportModal and TodoistImport: opened from Settings, both built on transferParts;
                     LocationMap: the location's map, an iframe on the web and a react-native-webview WebView on Android/iOS), journal/
                     (JournalModal, JournalItem) and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, SmallDialog:
-                    the frame of the settings and filters, Popover: a transparent Modal placed by measureInWindow, Toast and useToast,
+                    the frame of the settings, filters and import/export, closeDisabled while an import runs, Popover: a transparent Modal placed by measureInWindow, Toast and useToast,
                     ui: Button, IconButton, SwitchRow, icons)
                     The logic copied from frontend-react (api/, state/, lib/) is kept identical apart from import paths,
                     except caldav.ts (@xmldom/xmldom and a Transport) and useCalendarObjects.ts (reload returns a Promise)

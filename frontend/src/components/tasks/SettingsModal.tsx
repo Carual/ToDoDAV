@@ -5,16 +5,18 @@ import { useColors } from '../../theme.ts';
 import { ChevronDownIcon, ChevronUpIcon, GearIcon } from '../controls/icons.tsx';
 import { Select } from '../controls/Select.tsx';
 import { Note, Section, SettingRow, SmallDialog } from '../controls/SmallDialog.tsx';
-import { IconButton, SwitchRow } from '../controls/ui.tsx';
+import { Button, IconButton, SwitchRow } from '../controls/ui.tsx';
 
 interface Props {
   settings: ViewSettings;
   /** Changes apply at once, so the list behind shows the result. */
   onChange: (settings: ViewSettings) => void;
+  /** Opens the import and export dialog in place of this one; absent when there is no list to work on. */
+  onImportExport?: () => void;
   onClose: () => void;
 }
 
-export function SettingsModal({ settings, onChange, onClose }: Props) {
+export function SettingsModal({ settings, onChange, onImportExport, onClose }: Props) {
   const colors = useColors();
   const { layout, fields } = settings;
 
@@ -110,6 +112,13 @@ export function SettingsModal({ settings, onChange, onClose }: Props) {
           })}
         </View>
       </Section>
+
+      {onImportExport && (
+        <Section title="Import and export">
+          <Note>Move tasks in or out as an .ics file or a Todoist CSV, or bring in a whole Todoist account.</Note>
+          <Button label="Import or export" onPress={onImportExport} style={styles.button} />
+        </Section>
+      )}
     </SmallDialog>
   );
 }
@@ -118,4 +127,5 @@ const styles = StyleSheet.create({
   field: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 4 },
   grow: { flex: 1 },
   dimmed: { opacity: 0.3 },
+  button: { alignSelf: 'flex-start' },
 });
