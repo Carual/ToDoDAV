@@ -178,6 +178,7 @@ export function Tasks() {
           onClose={() => setCreating(false)}
           onSave={tasks.createTask}
           onToggle={toggleTask}
+          showMap={settings.showMap}
         />
       )}
       {sharing && calendar && config.feed && (

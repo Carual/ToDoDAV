@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Calendar } from '../../api/caldav.ts';
@@ -31,6 +31,8 @@ import {
   useModalStyles,
   type Guard,
 } from '../modalParts.tsx';
+// No extension: the bundler picks LocationMap.native.tsx (a WebView) on Android/iOS.
+import { LocationMap } from './LocationMap';
 import { RepeatField } from './RepeatField.tsx';
 import { dueColor, priorityColor, TaskCheckbox } from './TaskItem.tsx';
 import { Button, SwitchRow } from '../controls/ui.tsx';
@@ -64,9 +66,26 @@ interface Props {
   onOpenTask?: (task: Task) => void;
   /** Adds an open sub-task with this name; the save runs in the background. */
   onAddSubtask?: (summary: string) => void;
+  /** Show a map under the location (a setting, off by default). */
+  showMap?: boolean;
 }
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4];
+
+// Undocumented but keyless; the official Embed API would need every install to bring its own key.
+// If Google ever drops it, the map breaks but the location's Google Maps button keeps working.
+const embedUrl = (location: string) => `https://www.google.com/maps?q=${encodeURIComponent(location)}&output=embed`;
+/** Waits for typing to pause before reloading the map. */
+const MAP_DELAY_MS = 700;
+
+function useDebounced<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
 
 function initialEdits(task: Task | undefined): TaskEdits {
   if (!task) return { summary: '', description: '', priority: 4, categories: [], location: '' };
@@ -126,6 +145,7 @@ export function TaskModal({
   descendantCount = 0,
   onOpenTask,
   onAddSubtask,
+  showMap = false,
 }: Props) {
   const colors = useColors();
   const shared = useModalStyles();
@@ -138,6 +158,7 @@ export function TaskModal({
   // The name and description show as formatted Markdown, and turn into their editor when tapped, like Todoist.
   // A new task starts with the name being typed.
   const [editing, setEditing] = useState<'summary' | 'description' | null>(isNew ? 'summary' : null);
+  const mapLocation = useDebounced(edits.location.trim(), MAP_DELAY_MS);
 
   const update = (patch: Partial<TaskEdits>) => setEdits((current) => ({ ...current, ...patch }));
   const dirty = !sameEdits(edits, initialEdits(task));
@@ -417,6 +438,7 @@ export function TaskModal({
 
       <SidebarItem title="Location">
         <LocationInput value={edits.location} onChange={(location) => update({ location })} />
+        {showMap && mapLocation !== '' && <LocationMap uri={embedUrl(mapLocation)} title={`Map of ${mapLocation}`} />}
       </SidebarItem>
 
       {task && (

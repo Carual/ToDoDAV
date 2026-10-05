@@ -55,7 +55,8 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
                     in shared/), fileName, download.ts (a Blob link on the web; download.native.ts hands it to the share sheet)
   src/components/   TopBar, LogoMark, ShareModal (the feed link, on both pages), ListPage (what both pages share: the page
                     frame and its loading/error states, PageHeader, AddRow, SectionToggle, EmptyState), and modalParts (ModalShell, useLeavePrompt, LeaveDialog, DateField, MarkdownView, sidebar
-                    fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField, SettingsModal, FilterModal), journal/
+                    fields) under both modals; tasks/ (TaskModal, TaskItem, RepeatField, SettingsModal, FilterModal,
+                    LocationMap: the location's map, an iframe on the web and a react-native-webview WebView on Android/iOS), journal/
                     (JournalModal, JournalItem) and controls/ (DatePicker, TimeField, Select, Menu, ConfirmDialog, SmallDialog:
                     the frame of the settings and filters, Popover: a transparent Modal placed by measureInWindow, Toast and useToast,
                     ui: Button, IconButton, SwitchRow, icons)

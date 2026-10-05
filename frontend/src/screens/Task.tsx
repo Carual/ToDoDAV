@@ -41,6 +41,7 @@ export function Task({ navigation, route }: NativeStackScreenProps<TasksParams, 
       descendantCount={descendants(tree, task).length}
       onOpenTask={(other) => navigation.replace('Task', { uid: other.uid })}
       onAddSubtask={(summary) => tasks.addSubtask(task, summary)}
+      showMap={tasks.settings.showMap}
     />
   );
 }
