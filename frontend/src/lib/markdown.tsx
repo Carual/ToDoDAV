@@ -9,6 +9,15 @@ export { hasMarkdown, plainText, previewLine } from '../../../shared/markdown.ts
 // Markdown rendered as nested <Text> elements, never as HTML: whatever another app wrote in a task can't inject
 // markup. Only http(s), mailto and obsidian links open (isSafeHref), each in its own app.
 
+/**
+ * On the web, Linking opens every link in a new tab, which for mailto: and obsidian: would only be a blank one left
+ * behind once the app takes over: those open in place, and only web pages get a tab of their own.
+ */
+function openLink(href: string) {
+  if (Platform.OS === 'web' && !/^https?:/i.test(href)) window.location.href = href;
+  else void Linking.openURL(href).catch(() => {});
+}
+
 const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace, Menlo, Consolas, monospace' });
 
 function renderInline(nodes: Inline[], colors: Colors): ReactNode[] {
@@ -50,7 +59,7 @@ function renderInline(nodes: Inline[], colors: Colors): ReactNode[] {
             // The link opens on its own, without also opening the task row it sits in.
             onPress={(event) => {
               event.stopPropagation();
-              void Linking.openURL(node.href).catch(() => {});
+              openLink(node.href);
             }}
           >
             {renderInline(node.children, colors)}

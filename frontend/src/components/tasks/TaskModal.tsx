@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Calendar } from '../../api/caldav.ts';
@@ -26,6 +26,7 @@ import {
   MarkdownView,
   ModalShell,
   SidebarItem,
+  TitleInput,
   UidLine,
   useLeavePrompt,
   useModalStyles,
@@ -177,6 +178,8 @@ export function TaskModal({
   // A sub-task name typed but not added yet is unsaved work too, though Save does not add it.
   const [addingSubtask, setAddingSubtask] = useState(false);
   const [subtaskDraft, setSubtaskDraft] = useState('');
+  /** Escape typed in the sub-task field closes only the field. */
+  const subtaskFocused = useRef(false);
   const guarded = dirty || subtaskDraft.trim() !== '';
   const leave = useLeavePrompt(guard, guarded, onClose);
 
@@ -221,6 +224,7 @@ export function TaskModal({
   }
 
   function stopAddingSubtask() {
+    subtaskFocused.current = false;
     setAddingSubtask(false);
     setSubtaskDraft('');
   }
@@ -282,17 +286,11 @@ export function TaskModal({
         </View>
         <View style={shared.editor}>
           {editing === 'summary' ? (
-            <TextInput
-              style={[shared.titleInput, shared.field, { borderColor: colors.textTertiary }]}
+            <TitleInput
               value={edits.summary}
               onChangeText={(summary) => update({ summary })}
-              onBlur={() => setEditing(null)}
-              placeholder="Task name"
-              placeholderTextColor={colors.textTertiary}
-              aria-label="Task name"
-              autoFocus
-              submitBehavior="blurAndSubmit"
-              returnKeyType="done"
+              onDone={() => setEditing(null)}
+              label="Task name"
             />
           ) : (
             <MarkdownView label="Task name" formatted={hasMarkdown(edits.summary)} onEdit={() => setEditing('summary')}>
@@ -307,7 +305,7 @@ export function TaskModal({
             <DescriptionInput
               value={edits.description}
               onChangeText={(description) => update({ description })}
-              onBlur={() => setEditing(null)}
+              onDone={() => setEditing(null)}
               placeholder="Description"
               label="Description"
             />
@@ -359,6 +357,8 @@ export function TaskModal({
                 placeholderTextColor={colors.textTertiary}
                 aria-label="Sub-task name"
                 autoFocus
+                onFocus={() => (subtaskFocused.current = true)}
+                onBlur={() => (subtaskFocused.current = false)}
               />
               <Button label="Cancel" onPress={stopAddingSubtask} />
               <Button label="Add" variant="primary" onPress={addSubtask} disabled={!subtaskDraft.trim()} />
@@ -486,6 +486,11 @@ export function TaskModal({
       canSave={canSave}
       onSave={save}
       keys={!leave.asking && !confirmingDelete}
+      onEscape={() => {
+        if (!subtaskFocused.current) return false;
+        stopAddingSubtask();
+        return true;
+      }}
     >
       {leave.asking && (
         <LeaveDialog

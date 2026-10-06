@@ -78,7 +78,7 @@ export function TimeField({ value, onChange, 'aria-label': label }: Props) {
         </Text>
       </Pressable>
       {open && (
-        <Popover anchor={trigger} onClose={() => pick(undefined)} width={180} maxHeight={300}>
+        <Popover anchor={trigger} onClose={() => pick(typed)} width={180} maxHeight={300}>
           <TextInput
             value={draft}
             onChangeText={setDraft}

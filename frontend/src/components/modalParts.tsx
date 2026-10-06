@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
   useWindowDimensions,
+  type TextInputProps,
   type TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +30,7 @@ import { Select } from './controls/Select.tsx';
 import { TimeField } from './controls/TimeField.tsx';
 import { Button, IconButton } from './controls/ui.tsx';
 
-// What the task modal and the journal modal share, as frontend-react's modalParts.tsx.
+// What the task modal and the journal modal share.
 
 /** Time given to a date when "All day" is switched off. */
 export const DEFAULT_TIME = '09:00';
@@ -49,11 +50,17 @@ export type Guard = 'navigation' | 'self';
  */
 export function useLeavePrompt(guard: Guard, guarded: boolean, onClose: () => void) {
   const navigation = useNavigation();
-  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
+  /** What the question is about: how to leave, and what staying means (a browser move waits for the answer). */
+  const [pendingLeave, setPendingLeave] = useState<{ go: () => void; stay?: () => void } | null>(null);
   /** Set when the modal leaves on purpose (after saving, deleting...), so the navigator lets it go unasked. */
   const leavingOnPurpose = useRef(false);
 
-  const askThen = (go: () => void) => setPendingLeave(() => go);
+  const askThen = (go: () => void, stay?: () => void) => setPendingLeave({ go, stay });
+
+  // A modal that goes away while asking (its task reloaded under it) leaves a browser move waiting: it stays put.
+  const pendingRef = useRef(pendingLeave);
+  pendingRef.current = pendingLeave;
+  useEffect(() => () => pendingRef.current?.stay?.(), []);
 
   usePreventRemove(guard === 'navigation' && guarded, ({ data }) => {
     const go = () => navigation.dispatch(data.action);
@@ -61,22 +68,28 @@ export function useLeavePrompt(guard: Guard, guarded: boolean, onClose: () => vo
     else askThen(go);
   });
 
-  // The browser's Back and Forward don't reach usePreventRemove: while something is unsaved, leaveGuard.ts keeps
-  // the router from seeing them, and this puts the modal's entry back and asks. Leaving then goes back the usual
-  // way. A reload or closing the tab can only get the browser's own prompt.
+  // The browser's Back and Forward don't reach usePreventRemove, nor a modal that isn't a screen: while something
+  // is unsaved, leaveGuard.ts holds the move back and this asks. On Save or Discard the move is replayed: as a
+  // screen, the navigator then follows it (unasked, since the modal is leaving on purpose); otherwise the modal
+  // closes first. A reload or closing the tab can only get the browser's own prompt.
   useEffect(() => {
-    if (Platform.OS !== 'web' || guard !== 'navigation' || !guarded) return;
-    const entry = { state: window.history.state as unknown, url: window.location.href };
-    setLeaveGuard(() => {
-      if (leavingOnPurpose.current) return false; // the modal's own way out, already asked or nothing to ask
-      window.history.pushState(entry.state, '', entry.url);
-      askThen(onClose);
-      return true;
+    if (Platform.OS !== 'web' || !guarded) return;
+    const removeGuard = setLeaveGuard(() => {
+      if (leavingOnPurpose.current) return undefined; // the modal's own way out, already asked or nothing to ask
+      return new Promise<boolean>((resolve) =>
+        askThen(
+          () => {
+            if (guard === 'self') onClose();
+            resolve(true);
+          },
+          () => resolve(false),
+        ),
+      );
     });
     const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
-      setLeaveGuard(null);
+      removeGuard();
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
   }, [guard, guarded, onClose]);
@@ -105,9 +118,11 @@ export function useLeavePrompt(guard: Guard, guarded: boolean, onClose: () => vo
     leaveNow,
     /** The answer: leave (after Save or Discard) or stay. */
     answer(leave: boolean) {
-      const go = pendingLeave;
+      const pending = pendingLeave;
       setPendingLeave(null);
-      if (leave && go) leaveNow(go);
+      if (!pending) return;
+      if (leave) leaveNow(pending.go);
+      else pending.stay?.();
     },
   };
 }
@@ -132,6 +147,8 @@ interface ShellProps {
   onSave: () => void;
   /** Escape and Ctrl/⌘+Enter on the web, unless a dialog on top owns the keyboard. */
   keys: boolean;
+  /** Escape for something inside the modal (a field it closes) first: true when it was taken. */
+  onEscape?: () => boolean;
   /** Dialogs drawn over the modal. */
   children?: ReactNode;
 }
@@ -151,6 +168,7 @@ export function ModalShell({
   canSave,
   onSave,
   keys,
+  onEscape,
   children,
 }: ShellProps) {
   const colors = useColors();
@@ -159,14 +177,23 @@ export function ModalShell({
   const wide = width >= WIDE;
   const insets = useSafeAreaInsets();
 
+  // Escape on keyup, as react-native-web's Modal does: on keydown, the "Save changes?" dialog it opens would be up in
+  // time for the same key's keyup, which closes it again. A Modal on top (a picker, a dialog) takes that keyup and
+  // stops it before it reaches window, so Escape closes only the innermost thing.
   useEffect(() => {
     if (Platform.OS !== 'web' || !keys) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onRequestClose();
+    const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && canSave) onSave();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !onEscape?.()) onRequestClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   });
 
   const sidebarView = <View style={[styles.sidebar, wide ? styles.sidebarWide : styles.sidebarNarrow]}>{sidebar}</View>;
@@ -322,7 +349,11 @@ interface MarkdownViewProps {
   minHeight?: number;
 }
 
-/** The formatted text of a field; a tap opens its editor (a tap on a link opens the link instead). */
+/**
+ * The formatted text of a field; a tap opens its editor (a tap on a link opens the link instead). On the web, text
+ * with formatting or links only opens on a click in empty space, so its text can be selected and copied; the pencil
+ * beside it opens the editor too.
+ */
 export function MarkdownView({ label, formatted, onEdit, children, description, minHeight = 60 }: MarkdownViewProps) {
   const colors = useColors();
   const styles = useModalStyles();
@@ -331,7 +362,15 @@ export function MarkdownView({ label, formatted, onEdit, children, description, 
       <Pressable
         role="button"
         aria-label={`Edit ${label.toLowerCase()}`}
-        onPress={onEdit}
+        onPress={(event) => {
+          if (formatted && Platform.OS === 'web') {
+            // A drag that selected text was for copying it.
+            if (!window.getSelection()?.isCollapsed) return;
+            const { pageX, pageY } = event.nativeEvent;
+            if (isOverText(pageX - window.scrollX, pageY - window.scrollY)) return;
+          }
+          onEdit();
+        }}
         style={[styles.field, styles.grow, description && { minHeight }]}
       >
         {children ?? <Text style={[description ? styles.descriptionText : styles.titleText, styles.muted]}>{label}</Text>}
@@ -345,18 +384,44 @@ export function MarkdownView({ label, formatted, onEdit, children, description, 
   );
 }
 
+/**
+ * Whether the point is on a character rather than in empty space (web only). The element under it can't tell: a
+ * paragraph spans the whole width, past the end of a short line. So this finds the caret position there and checks
+ * whether the character on either side of it covers the point.
+ */
+function isOverText(x: number, y: number): boolean {
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false; // a key press, not a click
+  const position = document.caretPositionFromPoint?.(x, y);
+  const range = position ? undefined : document.caretRangeFromPoint?.(x, y);
+  const node = position?.offsetNode ?? range?.startContainer;
+  const offset = position?.offset ?? range?.startOffset ?? 0;
+  if (!node || node.nodeType !== Node.TEXT_NODE) return false;
+  const length = node.textContent?.length ?? 0;
+  const character = document.createRange();
+  for (const start of [offset - 1, offset]) {
+    if (start < 0 || start >= length) continue;
+    character.setStart(node, start);
+    character.setEnd(node, start + 1);
+    for (const rect of character.getClientRects()) {
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return true;
+    }
+  }
+  return false;
+}
+
 /** A text box that grows with its text (the web doesn't do it on its own), for descriptions. */
 export function DescriptionInput({
   value,
   onChangeText,
-  onBlur,
+  onDone,
   placeholder,
   label,
   minHeight = 60,
 }: {
   value: string;
   onChangeText: (text: string) => void;
-  onBlur: () => void;
+  /** The editor is left: the text shows formatted again. */
+  onDone: () => void;
   placeholder: string;
   label: string;
   minHeight?: number;
@@ -370,15 +435,64 @@ export function DescriptionInput({
       value={value}
       onChangeText={onChangeText}
       onContentSizeChange={(event) => setHeight(event.nativeEvent.contentSize.height + 8)}
-      onBlur={onBlur}
+      {...useEditor(value, onDone)}
       placeholder={placeholder}
       placeholderTextColor={colors.textTertiary}
       aria-label={label}
-      autoFocus
       multiline
       textAlignVertical="top"
     />
   );
+}
+
+/** The name or title's editor. */
+export function TitleInput({
+  value,
+  onChangeText,
+  onDone,
+  label,
+}: {
+  value: string;
+  onChangeText: (text: string) => void;
+  /** The editor is left: the text shows formatted again. */
+  onDone: () => void;
+  label: string;
+}) {
+  const colors = useColors();
+  const styles = useModalStyles();
+  return (
+    <TextInput
+      style={[styles.titleInput, styles.field, { borderColor: colors.textTertiary }]}
+      value={value}
+      onChangeText={onChangeText}
+      {...useEditor(value, onDone)}
+      placeholder={label}
+      placeholderTextColor={colors.textTertiary}
+      aria-label={label}
+      submitBehavior="blurAndSubmit"
+      returnKeyType="done"
+    />
+  );
+}
+
+/**
+ * What both editors share: they open with the focus and the caret at the end of the text (the selection is only
+ * set until it first changes, then left to the user), and close when left. Switching to another window doesn't
+ * count on the web: the field stays open and the browser gives it back its focus on return.
+ */
+function useEditor(value: string, onDone: () => void): TextInputProps {
+  const [selection, setSelection] = useState<{ start: number; end: number } | undefined>({
+    start: value.length,
+    end: value.length,
+  });
+  return {
+    autoFocus: true,
+    selection,
+    onSelectionChange: () => setSelection(undefined),
+    onBlur: () => {
+      if (Platform.OS !== 'web' || document.hasFocus()) onDone();
+    },
+  };
 }
 
 export function SidebarItem({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { Calendar } from '../../api/caldav.ts';
 import { sameDate, type LocalDate } from '../../api/ical.ts';
@@ -25,6 +25,7 @@ import {
   MarkdownView,
   ModalShell,
   SidebarItem,
+  TitleInput,
   UidLine,
   useLeavePrompt,
   useModalStyles,
@@ -131,17 +132,11 @@ export function JournalModal({ journal, calendar: initialCalendar, calendars = [
     <View style={shared.main}>
       <View style={shared.editor}>
         {editing === 'summary' ? (
-          <TextInput
-            style={[shared.titleInput, shared.field, { borderColor: colors.textTertiary }]}
+          <TitleInput
             value={edits.summary}
             onChangeText={(summary) => update({ summary })}
-            onBlur={() => setEditing(null)}
-            placeholder="Title"
-            placeholderTextColor={colors.textTertiary}
-            aria-label="Title"
-            autoFocus
-            submitBehavior="blurAndSubmit"
-            returnKeyType="done"
+            onDone={() => setEditing(null)}
+            label="Title"
           />
         ) : (
           <MarkdownView label="Title" formatted={hasMarkdown(edits.summary)} onEdit={() => setEditing('summary')}>
@@ -156,7 +151,7 @@ export function JournalModal({ journal, calendar: initialCalendar, calendars = [
           <DescriptionInput
             value={edits.description}
             onChangeText={(description) => update({ description })}
-            onBlur={() => setEditing(null)}
+            onDone={() => setEditing(null)}
             placeholder="Write something…"
             label="Text"
             minHeight={TEXT_HEIGHT}

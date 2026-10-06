@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { TaskModal } from '../components/tasks/TaskModal.tsx';
@@ -10,6 +11,7 @@ import { useTasks } from '../state/tasksContext.tsx';
 /** /tasks/<uid>: the task's modal over the list. */
 export function Task({ navigation, route }: NativeStackScreenProps<TasksParams, 'Task'>) {
   const { uid } = route.params;
+  const focused = useIsFocused();
   const tasks = useTasks();
   const { list, tree, view, calendarOf } = tasks;
   const task = list.tasks.find((t) => t.uid === uid);
@@ -23,7 +25,9 @@ export function Task({ navigation, route }: NativeStackScreenProps<TasksParams, 
     close();
   });
 
-  if (!task || !calendar) return null;
+  // A task opened from this one goes over it; this one steps aside meanwhile (one backdrop, not two) and comes back
+  // fresh, without edits the user chose to discard on the way.
+  if (!task || !calendar || !focused) return null;
   return (
     <TaskModal
       // Remount only when the content changes (a reload or a failed save), not when a save just confirms it.
@@ -39,7 +43,8 @@ export function Task({ navigation, route }: NativeStackScreenProps<TasksParams, 
       onCompleteForGood={(t) => tasks.setCompleted(t, true, true)}
       onDelete={tasks.deleteTask}
       descendantCount={descendants(tree, task).length}
-      onOpenTask={(other) => navigation.replace('Task', { uid: other.uid })}
+      // Pushed, so Back returns to this task; closing still pops them all (popTo).
+      onOpenTask={(other) => navigation.push('Task', { uid: other.uid })}
       onAddSubtask={(summary) => tasks.addSubtask(task, summary)}
       showMap={tasks.settings.showMap}
     />

@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -67,6 +68,20 @@ export function ListPage<Item>({
     setRefreshing(false);
   }
 
+  // Tasks and Journal stay as they were left while the other is on screen; coming back to one reads the server
+  // again, for changes made elsewhere meanwhile (the web has no pull to refresh). Not when a task or entry over the
+  // page closes: that only refocuses the page, not its section.
+  const navigation = useNavigation();
+  const latestList = useRef(list);
+  latestList.current = list;
+  useEffect(
+    () =>
+      navigation.getParent()?.addListener('focus', () => {
+        if (latestList.current.loaded) void latestList.current.reload();
+      }),
+    [navigation],
+  );
+
   // Not while typing, and not with a dialog of any kind (the task page, a picker) on top: the key is theirs then.
   useEffect(() => {
     if (Platform.OS !== 'web' || !onQuickAdd) return;
@@ -107,7 +122,18 @@ export function ListPage<Item>({
         data={items}
         keyExtractor={keyOf}
         renderItem={renderItem}
-        ListHeaderComponent={<>{header}</>}
+        ListHeaderComponent={
+          <>
+            {header}
+            {/* A reload that failed over a list already shown: the list stays, but it may be out of date. */}
+            {list.loadError && (
+              <View style={styles.errorBar} role="alert">
+                <Text style={styles.errorText}>{list.loadError}</Text>
+                <Button label="Try again" onPress={() => void list.reload()} />
+              </View>
+            )}
+          </>
+        }
         contentContainerStyle={[styles.column, gutter, styles.listEnd]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} colors={[colors.accent]} />}
       />
@@ -243,6 +269,18 @@ const makeStyles = (colors: Colors) =>
     column: { width: '100%', maxWidth: 800, alignSelf: 'center', paddingTop: 24 },
     listEnd: { paddingBottom: 96 },
     loading: { paddingVertical: 48 },
+    errorBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 8,
+      paddingVertical: 4,
+      paddingLeft: 10,
+      paddingRight: 4,
+      borderRadius: 5,
+      backgroundColor: colors.bgSoft,
+    },
+    errorText: { flex: 1, fontSize: 13, color: colors.p1 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
     title: { flexShrink: 1, fontSize: 26, lineHeight: 35, fontWeight: '700', color: colors.text },
     actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },

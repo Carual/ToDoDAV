@@ -38,6 +38,16 @@ export function Login() {
 
   async function submit() {
     if (busy) return;
+    // Caught here rather than by the server, which would only answer with a generic refusal.
+    const missing = [ASKS_SERVER && !server.trim() && 'server', !username.trim() && 'username', !password && 'password'].filter(
+      (field): field is string => Boolean(field),
+    );
+    if (missing.length > 0) {
+      setError(`Enter your ${new Intl.ListFormat('en', { type: 'conjunction' }).format(missing)}.`);
+      if (missing[0] === 'username') usernameInput.current?.focus();
+      if (missing[0] === 'password') passwordInput.current?.focus();
+      return;
+    }
     setBusy(true);
     setError(null);
     const credentials = { username: username.trim(), password };
@@ -192,7 +202,7 @@ const makeStyles = (colors: Colors) =>
       fontSize: 15,
       color: colors.text,
       backgroundColor: colors.bg,
-      // The browser's focus ring doubles the border, which turns darker on focus instead (as in frontend-react).
+      // The browser's focus ring doubles the border, which turns darker on focus instead.
       outlineWidth: 0,
     },
     error: { color: colors.p1, fontSize: 13, marginBottom: 16 },

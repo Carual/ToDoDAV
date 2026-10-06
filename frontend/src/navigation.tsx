@@ -2,6 +2,7 @@ import {
   createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
+  getPathFromState,
   getStateFromPath,
   NavigationContainer,
   type LinkingOptions,
@@ -88,7 +89,7 @@ export function Navigation() {
   const theme = { ...base, colors: { ...base.colors, background: colors.bg, text: colors.text, primary: colors.accent } };
 
   // A link opened without a session (at startup, or while the login screen is up) can only show Login. It is kept
-  // and followed after logging in, as frontend-react did, so a task link from a calendar still reaches the task.
+  // and followed after logging in, so a task link from a calendar still reaches the task.
   // getStateFromPath sees every link with its prefix already removed, on the web and on Android/iOS alike.
   const signedIn = useRef(session !== null);
   signedIn.current = session !== null;
@@ -104,9 +105,22 @@ export function Navigation() {
     [],
   );
 
+  // Logging out keeps the page that was open, to come back to after logging in again.
+  const lastAppPath = useRef<string | null>(null);
+  const rememberPath = () => {
+    const state = navigationRef.getRootState();
+    if (!signedIn.current || !state) return;
+    const path = getPathFromState(state, linking.config);
+    if (APP_PATH.test(path)) lastAppPath.current = path;
+  };
+
   useEffect(() => {
+    if (session === null) {
+      pendingPath.current ??= lastAppPath.current;
+      return;
+    }
     const path = pendingPath.current;
-    if (session === null || path === null) return;
+    if (path === null) return;
     pendingPath.current = null;
     // Runs after the navigator has swapped Login for the sections, so the link's screens exist.
     const state = getStateFromPath(path, linking.config);
@@ -116,7 +130,14 @@ export function Navigation() {
   // Without a session only Login exists, with one only the sections: logging in or out swaps them, and the
   // navigator shows the first one available. The toast (Undo, Retry...) sits over every screen.
   return (
-    <NavigationContainer ref={navigationRef} linking={withPendingLinks} theme={theme} documentTitle={{ enabled: false }}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={withPendingLinks}
+      theme={theme}
+      documentTitle={{ enabled: false }}
+      onReady={rememberPath}
+      onStateChange={rememberPath}
+    >
       <ToastProvider>
         <Root.Navigator screenOptions={useScreenOptions()}>
           {session === null ? (
