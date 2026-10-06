@@ -72,7 +72,8 @@ export function Login() {
 
   return (
     <SafeAreaView style={styles.page}>
-      <KeyboardAvoidingView style={styles.page} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android too: edge-to-edge (always on since SDK 54) no longer resizes the window for the keyboard. */}
+      <KeyboardAvoidingView style={styles.page} behavior="padding">
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
             <View style={styles.brand}>
