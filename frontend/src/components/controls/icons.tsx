@@ -220,3 +220,18 @@ export const ClockIcon = icon('0 0 12 12', 12, () => (
     <Path d="M6 3.5V6l1.75 1.25" stroke={c} strokeLinecap="round" strokeLinejoin="round" />
   </>
 ));
+
+/** Three lines: the sidebar. */
+export const MenuIcon = icon('0 0 24 24', 24, () => (
+  <Path d="M5 7h14M5 12h14M5 17h14" stroke={c} strokeLinecap="round" />
+));
+
+/** An arrow out of a door: log out. */
+export const LogOutIcon = icon('0 0 24 24', 24, () => (
+  <Path
+    d="M10 5.5H6.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1H10M14 8.5l3.5 3.5-3.5 3.5M17.5 12H9.5"
+    stroke={c}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  />
+));

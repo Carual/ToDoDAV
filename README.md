@@ -17,7 +17,7 @@ You already host your calendars and tasks on a CalDAV server (Radicale, Nextclou
 - See the tasks of all your lists at once, each tagged with its list, or switch to a single list (only calendars that support tasks are shown).
 - Open tasks sorted by due date, then priority, with color-coded due dates, labels and location.
 - Filters (the funnel next to the list name): show only some priorities, tasks due soon or undated, or one label.
-- Settings (the gear next to your name): nest sub-tasks under their parent or list them like any other task, put tasks without a due date at the end or at the top, show a map of each task's location, and choose which details each task shows and in what order.
+- Settings (in the sidebar, from the menu button at the top left): nest sub-tasks under their parent or list them like any other task, put tasks without a due date at the end or at the top, show a map of each task's location, and choose which details each task shows and in what order.
 - Complete a task with one click, with Undo.
 - See completed tasks in a collapsible section under the list, and reopen them.
 - Add tasks with the "+ Add task" row or the **Q** key.
