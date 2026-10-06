@@ -11,7 +11,7 @@ RUN npm --prefix frontend ci
 COPY . .
 RUN npm run build
 
-# Only the backend's runtime dependencies, without Vite, TypeScript and the rest of the dev tooling.
+# Only the backend's runtime dependencies, without TypeScript and the rest of the dev tooling.
 FROM node:24-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./

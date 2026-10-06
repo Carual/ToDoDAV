@@ -74,7 +74,7 @@ export function TaskCheckbox({ task, onToggle }: { task: Task; onToggle: (task: 
             {
               borderColor: color,
               borderWidth: strong ? 2 : 1,
-              // 8-digit hex: the priority color at 10%, as color-mix() tints it in frontend-react.
+              // 8-digit hex: the priority color at 10% (React Native has no color-mix()).
               backgroundColor: checked ? color : strong ? `${color}1a` : 'transparent',
             },
           ]}

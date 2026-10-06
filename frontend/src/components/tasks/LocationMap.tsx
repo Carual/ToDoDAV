@@ -1,6 +1,6 @@
 import { useColors } from '../../theme.ts';
 
-/** The map under the location, on the web: an iframe, as in frontend-react (the backend's CSP allows the frame). */
+/** The map under the location, on the web: an iframe (the backend's CSP allows the frame). */
 export function LocationMap({ uri, title }: { uri: string; title: string }) {
   const colors = useColors();
   return (

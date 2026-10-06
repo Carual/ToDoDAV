@@ -1,7 +1,7 @@
 import type { Task } from '../api/tasks.ts';
 import type { TaskTree } from './taskTree.ts';
 
-// How the tasks of the lists on screen become rows, as frontend-react's MainPage lists them.
+// How the tasks of the lists on screen become rows: sorted, filtered and nested.
 
 export type Compare = (a: Task, b: Task) => number;
 

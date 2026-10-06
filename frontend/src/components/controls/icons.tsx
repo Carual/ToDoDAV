@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import Svg, { Circle, Path, Rect, Text as SvgText } from 'react-native-svg';
 
-// The icons of frontend-react's icons.tsx, drawn with react-native-svg. `color` fills in for CSS's currentColor.
+// The app's icons, drawn with react-native-svg. `color` stands in for CSS's currentColor.
 
 export interface IconProps {
   color: string;
-  /** Width and height; each icon has its own default, as in frontend-react. */
+  /** Width and height; each icon has its own default. */
   size?: number;
 }
 

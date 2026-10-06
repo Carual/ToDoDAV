@@ -12,7 +12,7 @@ import { useJournalList } from './useJournalList.ts';
 
 /**
  * Everything about the journal entries on screen, shared by the Journal page (/journal) and the entry on top of it
- * (/journal/<uid>), as frontend-react's JournalPage held it.
+ * (/journal/<uid>).
  */
 function useJournalsState() {
   const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();

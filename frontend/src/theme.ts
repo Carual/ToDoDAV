@@ -1,6 +1,6 @@
 import { useColorScheme } from 'react-native';
 
-// Todoist-like look, the same colors as frontend-react's styles.css: light by default, dark when the system asks.
+// Todoist-like look: light by default, dark when the system asks.
 const light = {
   bg: '#ffffff',
   bgSoft: '#fcfaf8',

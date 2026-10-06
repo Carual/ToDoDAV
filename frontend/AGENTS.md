@@ -12,7 +12,7 @@ APIs get renamed, moved or removed between SDK releases, so don't write Expo, EA
 
 ## Commands
 
-Run them in `frontend/` (or the root scripts `npm run dev:app`, `npm run dev:web`, `npm run typecheck:app`).
+Run them in `frontend/` (or the root scripts `npm run dev:app`, `npm run dev` for the web build with the backend, `npm run typecheck:app`).
 
 ```sh
 npx expo install <package>  # always, instead of npm install: picks the version that fits the SDK

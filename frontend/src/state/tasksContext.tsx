@@ -15,8 +15,7 @@ import { useTaskList } from './useTaskList.ts';
 import { loadSettings, matchesFilters, saveSettings, type ViewSettings } from '../lib/viewSettings.ts';
 
 /**
- * Everything about the tasks on screen, shared by the list (/tasks) and the task page (/tasks/<uid>) on top of it,
- * as frontend-react's MainPage held it.
+ * Everything about the tasks on screen, shared by the list (/tasks) and the task page (/tasks/<uid>) on top of it.
  */
 function useTasksState() {
   const navigation = useNavigation<NativeStackNavigationProp<RootParams>>();

@@ -9,7 +9,7 @@ const config = getDefaultConfig(__dirname);
 config.watchFolders = [path.resolve(__dirname, '../shared')];
 
 // Same origin as in production for the web build: /proxy, /api and /feed go to the backend (npm run dev:backend),
-// as frontend-react's Vite server did. PORT is the backend's (root .env or environment).
+// as the reverse proxy does in production. PORT is the backend's (root .env or environment).
 const port = process.env.PORT ?? readEnvPort() ?? '3852';
 const backend = createProxyMiddleware({
   target: `http://127.0.0.1:${port}`,

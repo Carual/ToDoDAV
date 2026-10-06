@@ -7,8 +7,8 @@ export interface StoredLogin extends Credentials {
   transport: Transport;
 }
 
-// Web: sessionStorage, which survives a reload but is gone when the tab closes (never localStorage), with the same
-// key as frontend-react. The web build always goes through the /proxy of the server it was loaded from.
+// Web: sessionStorage, which survives a reload but is gone when the tab closes (never localStorage). The web build
+// always goes through the /proxy of the server it was loaded from.
 // Android/iOS: the Keystore/Keychain through expo-secure-store, so the app stays logged in.
 const KEY = 'tododav.credentials';
 const SAME_ORIGIN: Transport = { kind: 'proxy', origin: '' };

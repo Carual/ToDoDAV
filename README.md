@@ -50,11 +50,12 @@ The app in your browser does all the work and speaks CalDAV itself. The backend 
 ```sh
 git clone <this repo> tododav && cd tododav
 npm install
+npm --prefix frontend install
 cp .env.example .env    # set CALDAV_URL, CALDAV_USERNAME, CALDAV_PASSWORD
 npm run dev
 ```
 
-Open http://localhost:5173 and log in with the same username and password you put in `.env`.
+Open http://localhost:8081 and log in with the same username and password you put in `.env`.
 
 ## Deploying
 
@@ -62,6 +63,7 @@ Open http://localhost:5173 and log in with the same username and password you pu
 
    ```sh
    npm install
+   npm --prefix frontend install
    npm run build
    ```
 
