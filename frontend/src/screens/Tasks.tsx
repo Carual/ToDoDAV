@@ -1,6 +1,9 @@
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
+import type { Calendar } from '../api/caldav.ts';
 import type { Task } from '../api/tasks.ts';
 import { FilterIcon } from '../components/controls/icons.tsx';
 import { IconButton } from '../components/controls/ui.tsx';
@@ -12,6 +15,7 @@ import { SettingsModal } from '../components/tasks/SettingsModal.tsx';
 import { TaskItem } from '../components/tasks/TaskItem.tsx';
 import { TaskModal } from '../components/tasks/TaskModal.tsx';
 import { compareCompleted, hasShownChildren, openRows, subtaskCount, type Row } from '../lib/taskRows.ts';
+import type { TasksParams } from '../navigation.tsx';
 import { DEFAULT_SETTINGS, describeFilters, filtersActive, type Filters } from '../lib/viewSettings.ts';
 import { ALL } from '../state/calendarChoice.ts';
 import { useLoggedIn } from '../state/session.tsx';
@@ -49,6 +53,19 @@ export function Tasks() {
   /** UIDs of the tasks whose sub-tasks are hidden in the list. */
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
+  /** The list a new task goes in when something asked for one (the widget's +); otherwise the usual one. */
+  const [addTo, setAddTo] = useState<Calendar | undefined>();
+
+  // tododav://tasks?add=<list href> (the home-screen widget's +) opens a new task in that list.
+  const route = useRoute<RouteProp<TasksParams, 'TaskList'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<TasksParams, 'TaskList'>>();
+  const addParam = route.params?.add;
+  useEffect(() => {
+    if (addParam === undefined || !hasLists) return;
+    setAddTo(calendars.find((c) => c.href === addParam));
+    setCreating(true);
+    navigation.setParams({ add: undefined });
+  }, [addParam, hasLists, calendars, navigation]);
   const [editingSettings, setEditingSettings] = useState(false);
   const [editingFilters, setEditingFilters] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -188,12 +205,15 @@ export function Tasks() {
       gutter={narrow ? { paddingLeft: 26, paddingRight: 16 } : { paddingHorizontal: 55 }}
       onQuickAdd={hasLists ? () => setCreating(true) : undefined}
     >
-      {creating && tasks.newTaskCalendar && (
+      {creating && (addTo ?? tasks.newTaskCalendar) && (
         <TaskModal
           guard="self"
-          calendar={tasks.newTaskCalendar}
+          calendar={(addTo ?? tasks.newTaskCalendar)!}
           calendars={calendars}
-          onClose={() => setCreating(false)}
+          onClose={() => {
+            setCreating(false);
+            setAddTo(undefined);
+          }}
           onSave={tasks.createTask}
           onToggle={toggleTask}
           showMap={settings.showMap}

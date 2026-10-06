@@ -6,5 +6,8 @@ import './src/leaveGuard.ts';
 import { registerRootComponent } from 'expo';
 
 import { App } from './src/App.tsx';
+// No extension: register.android.ts on Android (the home-screen widget), a no-op elsewhere.
+import { registerWidget } from './src/widget/register';
 
 registerRootComponent(App);
+registerWidget();

@@ -68,3 +68,6 @@ export const fs = (size: number) => Math.round(size * TEXT_SCALE);
 export function useColors(): Colors {
   return useColorScheme() === 'dark' ? dark : light;
 }
+
+/** Both palettes, for what can't use the hook: the Android home-screen widget draws both and lets the launcher pick. */
+export const palettes = { light, dark };

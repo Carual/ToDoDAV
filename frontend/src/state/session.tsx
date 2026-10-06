@@ -1,8 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { CalDavError, type Calendar } from '../api/caldav.ts';
 import { logIn, type Session } from '../api/connect.ts';
 import { readLogin, writeLogin, type StoredLogin } from './loginStore.ts';
+// No extension: the bundler picks updateWidgets.android.ts on Android; elsewhere it does nothing.
+import { updateWidgets } from '../widget/updateWidgets';
 
 interface SessionContextValue {
   session: Session | null;
@@ -46,14 +49,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // The home-screen widget reads the server on its own: redraw it when leaving the app, so it shows what was done here.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background') updateWidgets();
+    });
+    return () => subscription.remove();
+  }, []);
+
   const signIn = useCallback((next: Session, login: StoredLogin) => {
-    void writeLogin(login);
+    // The widget uses the saved login, so it is redrawn once that is written.
+    void writeLogin(login).then(updateWidgets);
     setRestoreError(null);
     setSession(next);
   }, []);
 
   const signOut = useCallback(() => {
-    void writeLogin(null);
+    void writeLogin(null).then(updateWidgets);
     setSession(null);
   }, []);
 

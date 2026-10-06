@@ -40,7 +40,8 @@ export type RootParams = {
   Tasks: NavigatorScreenParams<TasksParams> | undefined;
   Journal: NavigatorScreenParams<JournalParams> | undefined;
 };
-export type TasksParams = { TaskList: undefined; Task: { uid: string } };
+/** `add`: open a new task, in the list with this href if there is one (tododav://tasks?add=..., from the widget). */
+export type TasksParams = { TaskList: { add?: string } | undefined; Task: { uid: string } };
 export type JournalParams = { EntryList: undefined; Entry: { uid: string } };
 
 declare global {
@@ -52,7 +53,8 @@ declare global {
 
 const linking: LinkingOptions<RootParams> = {
   // The web build reads the browser's address; on Android/iOS, tododav:// links (exp:// in Expo Go).
-  prefixes: [Linking.createURL('/')],
+  // tododav:// also as itself: the home-screen widget writes tododav://tasks/<uid>, which createURL's form doesn't match.
+  prefixes: [Linking.createURL('/'), 'tododav://'],
   config: {
     screens: {
       Login: 'login',
