@@ -1,6 +1,7 @@
 import { useNavigation, usePreventRemove } from '@react-navigation/native';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -24,7 +25,7 @@ import { todayDate } from '../lib/repeat.ts';
 import { useColors, fs, type Colors } from '../theme.ts';
 import { ConfirmDialog } from './controls/ConfirmDialog.tsx';
 import { DatePicker } from './controls/DatePicker.tsx';
-import { CloseIcon, HashIcon, MapPinIcon, PencilIcon } from './controls/icons.tsx';
+import { ChevronDownIcon, ChevronRightIcon, CloseIcon, HashIcon, MapPinIcon, PencilIcon } from './controls/icons.tsx';
 import { Menu, type MenuItem } from './controls/Menu.tsx';
 import { Select } from './controls/Select.tsx';
 import { TimeField } from './controls/TimeField.tsx';
@@ -36,6 +37,11 @@ import { Button, IconButton } from './controls/ui.tsx';
 export const DEFAULT_TIME = '09:00';
 /** From this width the details go in a sidebar next to the text, as on a computer. */
 const WIDE = 768;
+
+/** Whether the window is wide enough for the sidebar; below that, a phone's layout with bigger touch targets. */
+export function useWide(): boolean {
+  return useWindowDimensions().width >= WIDE;
+}
 
 /**
  * How leaving is guarded when something is unsaved. `navigation`: the modal is a screen (/tasks/<uid>), and every
@@ -140,6 +146,10 @@ interface ShellProps {
   main: ReactNode;
   /** The details: next to the text on wide screens, under it on phones. */
   sidebar: ReactNode;
+  /** What goes under the text on phones instead of `sidebar`, when the details are edited some other way (chips). */
+  narrowSidebar?: ReactNode;
+  /** Whether anything changed: on phones the footer only shows then (× already closes). */
+  dirty: boolean;
   /** Why the changes can't be saved, under the content. */
   message: string | null;
   saveLabel: string;
@@ -163,6 +173,8 @@ export function ModalShell({
   onRequestClose,
   main,
   sidebar,
+  narrowSidebar,
+  dirty,
   message,
   saveLabel,
   canSave,
@@ -173,8 +185,7 @@ export function ModalShell({
 }: ShellProps) {
   const colors = useColors();
   const styles = useModalStyles();
-  const { width } = useWindowDimensions();
-  const wide = width >= WIDE;
+  const wide = useWide();
   const insets = useSafeAreaInsets();
 
   // Escape on keyup, as react-native-web's Modal does: on keydown, the "Save changes?" dialog it opens would be up in
@@ -196,7 +207,22 @@ export function ModalShell({
     };
   });
 
-  const sidebarView = <View style={[styles.sidebar, wide ? styles.sidebarWide : styles.sidebarNarrow]}>{sidebar}</View>;
+  const sidebarView =
+    !wide && narrowSidebar !== undefined ? (
+      narrowSidebar
+    ) : (
+      <View style={[styles.sidebar, wide ? styles.sidebarWide : styles.sidebarNarrow]}>{sidebar}</View>
+    );
+  const headerButton = wide ? 28 : 40;
+  const footer = (wide || dirty) && (
+    <View style={styles.footer}>
+      <Text style={styles.footerMessage} role="alert">
+        {message}
+      </Text>
+      {wide && <Button label="Cancel" onPress={onRequestClose} />}
+      <Button label={saveLabel} variant="primary" onPress={onSave} disabled={!canSave} style={!wide && styles.footerButton} />
+    </View>
+  );
 
   const page = (
     <View style={[styles.backdrop, wide ? styles.backdropWide : null]}>
@@ -216,8 +242,8 @@ export function ModalShell({
             {crumb}
           </View>
           <View style={styles.headerActions}>
-            {menuItems.length > 0 && <Menu aria-label="More actions" items={menuItems} />}
-            <IconButton label="Close" onPress={onRequestClose}>
+            {menuItems.length > 0 && <Menu aria-label="More actions" items={menuItems} size={headerButton} />}
+            <IconButton label="Close" size={headerButton} onPress={onRequestClose}>
               <CloseIcon color={colors.textSecondary} />
             </IconButton>
           </View>
@@ -233,19 +259,18 @@ export function ModalShell({
             </ScrollView>
           </View>
         ) : (
-          <ScrollView style={styles.grow} keyboardShouldPersistTaps="handled">
-            {main}
-            {sidebarView}
-          </ScrollView>
+          // Android too: edge-to-edge no longer resizes the window for the keyboard, which would cover the field
+          // being typed in and the Save button.
+          <KeyboardAvoidingView style={styles.grow} behavior="padding">
+            <ScrollView style={styles.grow} keyboardShouldPersistTaps="handled">
+              {main}
+              {sidebarView}
+            </ScrollView>
+            {footer}
+          </KeyboardAvoidingView>
         )}
 
-        <View style={styles.footer}>
-          <Text style={styles.footerMessage} role="alert">
-            {message}
-          </Text>
-          <Button label="Cancel" onPress={onRequestClose} />
-          <Button label={saveLabel} variant="primary" onPress={onSave} disabled={!canSave} />
-        </View>
+        {wide && footer}
       </View>
       {children}
     </View>
@@ -306,6 +331,7 @@ interface DateFieldProps {
 export function DateField({ label, value, allDay, colored = false, onChange }: DateFieldProps) {
   const colors = useColors();
   const styles = useModalStyles();
+  const wide = useWide();
   return (
     <View style={styles.dateField}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -327,7 +353,7 @@ export function DateField({ label, value, allDay, colored = false, onChange }: D
           />
         )}
         {value && (
-          <IconButton label={`Remove ${label.toLowerCase()}`} size={24} onPress={() => onChange(undefined)}>
+          <IconButton label={`Remove ${label.toLowerCase()}`} size={wide ? 24 : 36} onPress={() => onChange(undefined)}>
             <CloseIcon color={colors.textTertiary} size={18} />
           </IconButton>
         )}
@@ -357,6 +383,7 @@ interface MarkdownViewProps {
 export function MarkdownView({ label, formatted, onEdit, children, description, minHeight = 60 }: MarkdownViewProps) {
   const colors = useColors();
   const styles = useModalStyles();
+  const wide = useWide();
   return (
     <View style={styles.inlineTop}>
       <Pressable
@@ -376,7 +403,7 @@ export function MarkdownView({ label, formatted, onEdit, children, description, 
         {children ?? <Text style={[description ? styles.descriptionText : styles.titleText, styles.muted]}>{label}</Text>}
       </Pressable>
       {formatted && (
-        <IconButton label={`Edit ${label.toLowerCase()}`} size={24} onPress={onEdit} style={styles.pencil}>
+        <IconButton label={`Edit ${label.toLowerCase()}`} size={wide ? 24 : 32} onPress={onEdit} style={styles.pencil}>
           <PencilIcon color={colors.textTertiary} size={18} />
         </IconButton>
       )}
@@ -510,6 +537,62 @@ export function SidebarItem({ title, action, children }: { title: string; action
   );
 }
 
+/** A detail under the text on phones (the date, priority...), showing its value; a tap opens its sheet. */
+export function Chip({
+  icon,
+  text,
+  label,
+  tint,
+  empty = false,
+  after,
+  onPress,
+}: {
+  icon: ReactNode;
+  text: ReactNode;
+  /** What the chip edits, for assistive technologies ("Due date: Today"). */
+  label: string;
+  tint?: string;
+  /** No value yet: the text is a muted placeholder. */
+  empty?: boolean;
+  /** Drawn after the text (a repeat icon). */
+  after?: ReactNode;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  const styles = useModalStyles();
+  return (
+    <Pressable
+      role="button"
+      aria-label={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, pressed && { backgroundColor: colors.bgHover }]}
+    >
+      {icon}
+      <Text style={[styles.chipText, { color: empty ? colors.textTertiary : (tint ?? colors.text) }]} numberOfLines={1}>
+        {text}
+      </Text>
+      {after}
+    </Pressable>
+  );
+}
+
+/** What is rarely looked at on a phone (details from other apps, the UID), behind a row that opens it. */
+export function MoreDetails({ children }: { children: ReactNode }) {
+  const colors = useColors();
+  const styles = useModalStyles();
+  const [open, setOpen] = useState(false);
+  const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
+  return (
+    <View style={styles.more}>
+      <Pressable role="button" aria-expanded={open} onPress={() => setOpen(!open)} style={styles.moreToggle}>
+        <Chevron color={colors.textTertiary} size={14} />
+        <Text style={styles.sidebarTitle}>Details</Text>
+      </Pressable>
+      {open && children}
+    </View>
+  );
+}
+
 /** The calendar a new item goes in (a selector when there are several), or the one it is in. */
 export function CalendarField({
   label,
@@ -545,13 +628,22 @@ export function CalendarField({
 }
 
 /** Labels typed as one comma-separated line. */
-export function LabelsInput({ initial, onChange }: { initial: string[]; onChange: (labels: string[]) => void }) {
+export function LabelsInput({
+  initial,
+  onChange,
+  autoFocus,
+}: {
+  initial: string[];
+  onChange: (labels: string[]) => void;
+  autoFocus?: boolean;
+}) {
   const colors = useColors();
   const styles = useModalStyles();
   const [text, setText] = useState(() => initial.join(', '));
+  const wide = useWide();
   return (
     <TextInput
-      style={styles.textInput}
+      style={[styles.textInput, !wide && styles.textInputNarrow]}
       value={text}
       onChangeText={(next) => {
         setText(next);
@@ -561,6 +653,7 @@ export function LabelsInput({ initial, onChange }: { initial: string[]; onChange
       placeholderTextColor={colors.textTertiary}
       aria-label="Labels"
       autoCapitalize="none"
+      autoFocus={autoFocus}
     />
   );
 }
@@ -569,18 +662,28 @@ export function LabelsInput({ initial, onChange }: { initial: string[]; onChange
 const mapUrl = (location: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`;
 
 /** Free-text location, with a button that opens it in Google Maps. */
-export function LocationInput({ value, onChange }: { value: string; onChange: (location: string) => void }) {
+export function LocationInput({
+  value,
+  onChange,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (location: string) => void;
+  autoFocus?: boolean;
+}) {
   const colors = useColors();
   const styles = useModalStyles();
+  const wide = useWide();
   return (
     <View style={styles.inline}>
       <TextInput
-        style={[styles.textInput, styles.grow]}
+        style={[styles.textInput, !wide && styles.textInputNarrow, styles.grow]}
         value={value}
         onChangeText={onChange}
         placeholder="Address or place"
         placeholderTextColor={colors.textTertiary}
         aria-label="Location"
+        autoFocus={autoFocus}
       />
       {value.trim() !== '' && (
         <IconButton label="Open in Google Maps" onPress={() => void Linking.openURL(mapUrl(value.trim()))}>
@@ -597,11 +700,14 @@ export function Details({
   url,
   created,
   lastModified,
+  bare = false,
 }: {
   rows?: [term: string, value: string][];
   url?: string;
   created?: Date;
   lastModified?: Date;
+  /** Without its heading, under a toggle that already says "Details". */
+  bare?: boolean;
 }) {
   const colors = useColors();
   const all: [string, ReactNode][] = [...(rows ?? [])];
@@ -621,15 +727,12 @@ export function Details({
   if (created) all.push(['Created', formatDateTime(created)]);
   if (lastModified) all.push(['Modified', formatDateTime(lastModified)]);
   if (all.length === 0) return null;
-  return (
-    <SidebarItem title="Details">
-      {all.map(([term, value]) => (
-        <Detail key={term} term={term}>
-          {value}
-        </Detail>
-      ))}
-    </SidebarItem>
-  );
+  const list = all.map(([term, value]) => (
+    <Detail key={term} term={term}>
+      {value}
+    </Detail>
+  ));
+  return bare ? <View style={{ gap: 8 }}>{list}</View> : <SidebarItem title="Details">{list}</SidebarItem>;
 }
 
 function Detail({ term, children }: { term: string; children: ReactNode }) {
@@ -739,6 +842,7 @@ const makeStyles = (colors: Colors) => {
       color: colors.text,
       outlineWidth: 0,
     },
+    textInputNarrow: { minHeight: 44, fontSize: fs(15) },
     detail: { flexDirection: 'row', gap: 8 },
     detailTerm: { width: 70, fontSize: fs(12), color: colors.textTertiary },
     detailValue: { flex: 1, fontSize: fs(12), color: colors.text },
@@ -754,5 +858,26 @@ const makeStyles = (colors: Colors) => {
       backgroundColor: colors.bg,
     },
     footerMessage: { flex: 1, minWidth: 0, fontSize: fs(13), color: colors.p1 },
+    footerButton: { minHeight: 44, paddingHorizontal: 24 },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 40,
+      maxWidth: '100%',
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipText: { flexShrink: 1, fontSize: fs(14) },
+    more: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.divider,
+    },
+    moreToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
   });
 };

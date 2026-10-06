@@ -249,7 +249,7 @@ export function TaskItem({ task, depth = 0, indent, subtasks, fields, project, c
   return (
     <Pressable
       onPress={() => onOpen(task)}
-      style={({ pressed, hovered }) => [rowStyle, (pressed || hovered) && { backgroundColor: colors.bgSoft }]}
+      style={({ pressed, hovered }) => [rowStyle, pressed ? { backgroundColor: colors.bgHover } : hovered && { backgroundColor: colors.bgSoft }]}
     >
       {content}
     </Pressable>

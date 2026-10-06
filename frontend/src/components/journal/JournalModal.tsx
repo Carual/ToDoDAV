@@ -216,6 +216,7 @@ export function JournalModal({ journal, calendar: initialCalendar, calendars = [
       onRequestClose={leave.requestClose}
       main={main}
       sidebar={sidebar}
+      dirty={dirty || isNew}
       message={dirty ? problem : null}
       saveLabel={isNew ? `Add ${kind}` : 'Save'}
       canSave={canSave}

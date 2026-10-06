@@ -16,14 +16,14 @@ export interface MenuItem {
 }
 
 /** A three-dots button with a list of actions. */
-export function Menu({ items, 'aria-label': label }: { items: MenuItem[]; 'aria-label': string }) {
+export function Menu({ items, 'aria-label': label, size }: { items: MenuItem[]; 'aria-label': string; size?: number }) {
   const colors = useColors();
   const trigger = useRef<View>(null);
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <IconButton ref={trigger} label={label} onPress={() => setOpen(true)}>
+      <IconButton ref={trigger} label={label} size={size} onPress={() => setOpen(true)}>
         <MoreIcon color={colors.textSecondary} />
       </IconButton>
       {open && (

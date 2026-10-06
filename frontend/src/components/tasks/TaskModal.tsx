@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { Calendar } from '../../api/caldav.ts';
@@ -11,11 +11,24 @@ import { describeDue } from '../../lib/format.ts';
 import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../../lib/markdown.tsx';
 import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../../lib/repeat.ts';
 import { useColors, fs, type Colors } from '../../theme.ts';
+import { BottomSheet } from '../controls/BottomSheet.tsx';
 import { ConfirmDialog } from '../controls/ConfirmDialog.tsx';
-import { CheckIcon, DownloadIcon, FlagIcon, PlusIcon, RepeatIcon, TrashIcon } from '../controls/icons.tsx';
+import {
+  CalendarIcon,
+  CheckIcon,
+  DownloadIcon,
+  FlagIcon,
+  HashIcon,
+  MapPinIcon,
+  PlusIcon,
+  RepeatIcon,
+  TagIcon,
+  TrashIcon,
+} from '../controls/icons.tsx';
 import type { MenuItem } from '../controls/Menu.tsx';
 import {
   CalendarField,
+  Chip,
   DateField,
   DEFAULT_TIME,
   DescriptionInput,
@@ -25,11 +38,13 @@ import {
   LocationInput,
   MarkdownView,
   ModalShell,
+  MoreDetails,
   SidebarItem,
   TitleInput,
   UidLine,
   useLeavePrompt,
   useModalStyles,
+  useWide,
   type Guard,
 } from '../modalParts.tsx';
 // No extension: the bundler picks LocationMap.native.tsx (a WebView) on Android/iOS.
@@ -72,6 +87,17 @@ interface Props {
 }
 
 const PRIORITIES: Priority[] = [1, 2, 3, 4];
+
+/** On a phone, each detail is a chip under the text, edited in a sheet of its own. */
+type Sheet = 'date' | 'priority' | 'labels' | 'location' | 'project';
+
+const SHEET_TITLES: Record<Sheet, string> = {
+  date: 'Date',
+  priority: 'Priority',
+  labels: 'Labels',
+  location: 'Location',
+  project: 'Project',
+};
 
 // Undocumented but keyless; the official Embed API would need every install to bring its own key.
 // If Google ever drops it, the map breaks but the location's Google Maps button keeps working.
@@ -151,6 +177,7 @@ export function TaskModal({
   const colors = useColors();
   const shared = useModalStyles();
   const styles = makeStyles(colors);
+  const wide = useWide();
 
   const isNew = task === undefined;
   const [calendar, setCalendar] = useState(initialCalendar);
@@ -236,6 +263,7 @@ export function TaskModal({
   }
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [sheet, setSheet] = useState<Sheet | null>(null);
 
   /** The three-dots menu in the header: actions that are rarely needed or can't be taken back as easily. */
   const menuItems: MenuItem[] = [];
@@ -261,7 +289,7 @@ export function TaskModal({
     menuItems.push({ label: 'Delete', icon: (color) => <TrashIcon color={color} />, danger: true, onSelect: () => setConfirmingDelete(true) });
   }
 
-  const main = (
+  const renderMain = (chips: ReactNode) => (
     <View style={shared.main}>
       <View style={styles.titleRow}>
         <View style={styles.titleCheck}>
@@ -322,6 +350,8 @@ export function TaskModal({
         </View>
       </View>
 
+      {!wide && chips}
+
       {task && onAddSubtask && (
         <View style={styles.subtasks} aria-label="Sub-tasks">
           {subtasks.length > 0 && (
@@ -340,6 +370,7 @@ export function TaskModal({
                   onOpen={openOther}
                   onToggle={onToggle}
                   styles={styles}
+                  narrow={!wide}
                 />
               ))}
             </>
@@ -347,7 +378,7 @@ export function TaskModal({
           {addingSubtask ? (
             <View style={styles.subtaskAdd}>
               <TextInput
-                style={[styles.subtaskInput, { borderColor: colors.border }]}
+                style={[styles.subtaskInput, !wide && styles.narrowInput, { borderColor: colors.border }]}
                 value={subtaskDraft}
                 onChangeText={setSubtaskDraft}
                 onSubmitEditing={addSubtask}
@@ -364,7 +395,7 @@ export function TaskModal({
               <Button label="Add" variant="primary" onPress={addSubtask} disabled={!subtaskDraft.trim()} />
             </View>
           ) : (
-            <Pressable role="button" onPress={() => setAddingSubtask(true)} style={styles.addRow}>
+            <Pressable role="button" onPress={() => setAddingSubtask(true)} style={[styles.addRow, !wide && styles.narrowRow]}>
               <PlusIcon color={colors.accent} />
               <Text style={styles.addText}>Add sub-task</Text>
             </Pressable>
@@ -374,38 +405,63 @@ export function TaskModal({
     </View>
   );
 
+  const canPickProject = isNew && calendars.length > 1;
+  const projectField = (
+    <CalendarField label="Project" calendar={calendar} calendars={calendars} canPick={canPickProject} onChange={setCalendar} />
+  );
+
+  const dateSwitches = (
+    <View style={shared.switches}>
+      <SwitchRow label="All day" value={allDay} onChange={toggleAllDay} />
+      <SwitchRow label="Start date" value={showStart} onChange={toggleStart} />
+    </View>
+  );
+  const dateFields = (
+    <>
+      {showStart && (
+        <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => changeDate('start', start)} />
+      )}
+      <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => changeDate('due', due)} />
+      <RepeatField value={edits.recurrence} anchor={repeatAnchor} allDay={allDay} onChange={changeRepeat} />
+      {edits.recurrence && !edits.start && !edits.due && (
+        <View style={shared.inline}>
+          <RepeatIcon color={colors.dueTomorrow} />
+          <Text style={[shared.note, { color: colors.dueTomorrow }]}>Without a date, the repeat is removed too.</Text>
+        </View>
+      )}
+    </>
+  );
+
+  // In a sheet, the field takes the focus at once: it is the only thing there.
+  const labelsField = (autoFocus: boolean) => (
+    <LabelsInput initial={edits.categories} onChange={(categories) => update({ categories })} autoFocus={autoFocus} />
+  );
+  const locationField = (autoFocus: boolean) => (
+    <>
+      <LocationInput value={edits.location} onChange={(location) => update({ location })} autoFocus={autoFocus} />
+      {showMap && mapLocation !== '' && <LocationMap uri={embedUrl(mapLocation)} title={`Map of ${mapLocation}`} />}
+    </>
+  );
+
+  const details = task && (
+    <Details
+      rows={[
+        ...(task.status ? [['Status', task.status.toLowerCase().replace('-', ' ')] as [string, string]] : []),
+        ...(task.percentComplete !== undefined ? [['Progress', `${task.percentComplete}%`] as [string, string]] : []),
+      ]}
+      url={task.url}
+      created={task.created}
+      lastModified={task.lastModified}
+      bare={!wide}
+    />
+  );
+
   const sidebar = (
     <>
-      <SidebarItem title="Project">
-        <CalendarField
-          label="Project"
-          calendar={calendar}
-          calendars={calendars}
-          canPick={isNew && calendars.length > 1}
-          onChange={setCalendar}
-        />
-      </SidebarItem>
+      <SidebarItem title="Project">{projectField}</SidebarItem>
 
-      <SidebarItem
-        title="Dates"
-        action={
-          <View style={shared.switches}>
-            <SwitchRow label="All day" value={allDay} onChange={toggleAllDay} />
-            <SwitchRow label="Start date" value={showStart} onChange={toggleStart} />
-          </View>
-        }
-      >
-        {showStart && (
-          <DateField label="Start date" value={edits.start} allDay={allDay} onChange={(start) => changeDate('start', start)} />
-        )}
-        <DateField label="Due date" value={edits.due} allDay={allDay} colored onChange={(due) => changeDate('due', due)} />
-        <RepeatField value={edits.recurrence} anchor={repeatAnchor} allDay={allDay} onChange={changeRepeat} />
-        {edits.recurrence && !edits.start && !edits.due && (
-          <View style={shared.inline}>
-            <RepeatIcon color={colors.dueTomorrow} />
-            <Text style={[shared.note, { color: colors.dueTomorrow }]}>Without a date, the repeat is removed too.</Text>
-          </View>
-        )}
+      <SidebarItem title="Dates" action={dateSwitches}>
+        {dateFields}
       </SidebarItem>
 
       <SidebarItem title="Priority">
@@ -432,29 +488,113 @@ export function TaskModal({
         </View>
       </SidebarItem>
 
-      <SidebarItem title="Labels">
-        <LabelsInput initial={edits.categories} onChange={(categories) => update({ categories })} />
-      </SidebarItem>
+      <SidebarItem title="Labels">{labelsField(false)}</SidebarItem>
 
-      <SidebarItem title="Location">
-        <LocationInput value={edits.location} onChange={(location) => update({ location })} />
-        {showMap && mapLocation !== '' && <LocationMap uri={embedUrl(mapLocation)} title={`Map of ${mapLocation}`} />}
-      </SidebarItem>
+      <SidebarItem title="Location">{locationField(false)}</SidebarItem>
 
-      {task && (
-        <Details
-          rows={[
-            ...(task.status ? [['Status', task.status.toLowerCase().replace('-', ' ')] as [string, string]] : []),
-            ...(task.percentComplete !== undefined ? [['Progress', `${task.percentComplete}%`] as [string, string]] : []),
-          ]}
-          url={task.url}
-          created={task.created}
-          lastModified={task.lastModified}
-        />
-      )}
+      {details}
 
       {task && <UidLine uid={task.uid} />}
     </>
+  );
+
+  // The chips show what will be saved: the dates in the chosen mode.
+  const dateShown = finalEdits.due ?? finalEdits.start;
+  const dateTint = dateShown ? dueColor(colors, describeDue(dateShown).tone) : colors.textTertiary;
+  const dateText = finalEdits.due
+    ? describeDue(finalEdits.due).label
+    : finalEdits.start
+      ? `Starts ${describeDue(finalEdits.start).label}`
+      : 'Date';
+  const flagColor = priorityColor(colors, edits.priority);
+  const labelsText = edits.categories.join(', ');
+  const location = edits.location.trim();
+
+  const chips = (
+    <View style={[shared.chips, styles.chipsIndent]}>
+      <Chip
+        label={`Date: ${dateShown ? dateText : 'none'}`}
+        icon={<CalendarIcon color={dateTint} size={16} />}
+        text={dateText}
+        tint={dateTint}
+        empty={!dateShown}
+        after={edits.recurrence && <RepeatIcon color={dateTint} />}
+        onPress={() => setSheet('date')}
+      />
+      <Chip
+        label={`Priority ${edits.priority}`}
+        icon={<FlagIcon color={flagColor} size={16} />}
+        text={edits.priority === 4 ? 'Priority' : `P${edits.priority}`}
+        tint={flagColor}
+        empty={edits.priority === 4}
+        onPress={() => setSheet('priority')}
+      />
+      <Chip
+        label={`Labels: ${labelsText || 'none'}`}
+        icon={<TagIcon color={colors.textTertiary} size={14} />}
+        text={labelsText || 'Labels'}
+        empty={!labelsText}
+        onPress={() => setSheet('labels')}
+      />
+      <Chip
+        label={`Location: ${location || 'none'}`}
+        icon={<MapPinIcon color={colors.textTertiary} size={16} />}
+        text={location || 'Location'}
+        empty={!location}
+        onPress={() => setSheet('location')}
+      />
+      {canPickProject && (
+        <Chip
+          label={`Project: ${calendar.name}`}
+          icon={<HashIcon color={calendar.color ?? colors.textTertiary} size={14} />}
+          text={calendar.name}
+          onPress={() => setSheet('project')}
+        />
+      )}
+    </View>
+  );
+
+  const sheetView = sheet && (
+    <BottomSheet label={SHEET_TITLES[sheet]} onClose={() => setSheet(null)}>
+      {sheet === 'date' && (
+        <>
+          {dateSwitches}
+          {dateFields}
+        </>
+      )}
+      {sheet === 'priority' && (
+        <View role="radiogroup" aria-label="Priority">
+          {PRIORITIES.map((p) => {
+            const chosen = edits.priority === p;
+            return (
+              <Pressable
+                key={p}
+                role="radio"
+                aria-checked={chosen}
+                onPress={() => {
+                  // One choice to make: picking it is done.
+                  update({ priority: p });
+                  setSheet(null);
+                }}
+                style={({ pressed }) => [styles.priorityRow, pressed && { backgroundColor: colors.bgHover }]}
+              >
+                <FlagIcon color={priorityColor(colors, p)} size={20} />
+                <Text style={styles.priorityRowText}>Priority {p}</Text>
+                {chosen && <CheckIcon color={colors.accent} size={18} />}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+      {sheet === 'labels' && (
+        <>
+          {labelsField(true)}
+          <Text style={shared.note}>Separate labels with commas.</Text>
+        </>
+      )}
+      {sheet === 'location' && locationField(true)}
+      {sheet === 'project' && projectField}
+    </BottomSheet>
   );
 
   return (
@@ -479,19 +619,30 @@ export function TaskModal({
       }
       menuItems={menuItems}
       onRequestClose={leave.requestClose}
-      main={main}
+      main={renderMain(chips)}
       sidebar={sidebar}
+      narrowSidebar={
+        task ? (
+          <MoreDetails>
+            {details}
+            <UidLine uid={task.uid} />
+          </MoreDetails>
+        ) : null
+      }
+      dirty={dirty || isNew}
       message={dirty ? problem : null}
       saveLabel={isNew ? 'Add task' : 'Save'}
       canSave={canSave}
       onSave={save}
-      keys={!leave.asking && !confirmingDelete}
+      keys={!leave.asking && !confirmingDelete && !sheet}
       onEscape={() => {
         if (!subtaskFocused.current) return false;
         stopAddingSubtask();
         return true;
       }}
     >
+      {sheetView}
+
       {leave.asking && (
         <LeaveDialog
           kind="task"
@@ -536,17 +687,23 @@ function SubtaskRow({
   onOpen,
   onToggle,
   styles,
+  narrow,
 }: {
   task: Task;
   onOpen?: (task: Task) => void;
   onToggle: (task: Task) => void;
   styles: Styles;
+  /** On a phone: a taller row, easier to tap. */
+  narrow: boolean;
 }) {
   const colors = useColors();
   const due = task.due && describeDue(task.due);
   const dueTint = due && (task.completed ? colors.textTertiary : dueColor(colors, due.tone));
   return (
-    <Pressable onPress={() => onOpen?.(task)} style={styles.subtask}>
+    <Pressable
+      onPress={() => onOpen?.(task)}
+      style={({ pressed }) => [styles.subtask, narrow && styles.narrowSubtask, pressed && { backgroundColor: colors.bgHover }]}
+    >
       <TaskCheckbox task={task} onToggle={onToggle} />
       <Text style={[styles.subtaskTitle, task.completed && styles.struck]}>
         {task.summary ? <InlineMarkdown text={task.summary} /> : <Text style={{ color: colors.textTertiary }}>Untitled task</Text>}
@@ -596,5 +753,11 @@ const makeStyles = (colors: Colors) =>
     addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
     addText: { fontSize: fs(14), color: colors.textTertiary },
     priorities: { flexDirection: 'row', gap: 4 },
+    chipsIndent: { paddingLeft: 26 },
+    narrowInput: { minHeight: 44, fontSize: fs(15) },
+    narrowRow: { minHeight: 44 },
+    narrowSubtask: { paddingVertical: 11 },
+    priorityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 4, borderRadius: 8 },
+    priorityRowText: { flex: 1, fontSize: fs(15), color: colors.text },
     priority: { width: 34, height: 34, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   });
