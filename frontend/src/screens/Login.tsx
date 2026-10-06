@@ -18,7 +18,7 @@ import { connect, logIn, normalizeServerUrl } from '../api/connect.ts';
 import { LogoMark } from '../components/LogoMark.tsx';
 import { readLastLogin, writeLastLogin } from '../state/loginStore.ts';
 import { useSession } from '../state/session.tsx';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 
 // The web build is served by the ToDoDAV backend and goes through its /proxy; the apps ask for the server.
 const ASKS_SERVER = Platform.OS !== 'web';
@@ -190,23 +190,23 @@ const makeStyles = (colors: Colors) =>
     scroll: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 24 },
     card: { width: '100%', maxWidth: 400, alignSelf: 'center' },
     brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    brandText: { fontSize: 18, fontWeight: '700', color: colors.text },
-    title: { fontSize: 32, lineHeight: 38, fontWeight: '700', color: colors.text, marginTop: 40, marginBottom: 24 },
+    brandText: { fontSize: fs(18), fontWeight: '700', color: colors.text },
+    title: { fontSize: fs(32), lineHeight: fs(38), fontWeight: '700', color: colors.text, marginTop: 40, marginBottom: 24 },
     field: { marginBottom: 16 },
-    label: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 6 },
+    label: { fontSize: fs(13), fontWeight: '600', color: colors.text, marginBottom: 6 },
     input: {
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: 8,
       paddingHorizontal: 12,
       paddingVertical: 10,
-      fontSize: 15,
+      fontSize: fs(15),
       color: colors.text,
       backgroundColor: colors.bg,
       // The browser's focus ring doubles the border, which turns darker on focus instead.
       outlineWidth: 0,
     },
-    error: { color: colors.p1, fontSize: 13, marginBottom: 16 },
+    error: { color: colors.p1, fontSize: fs(13), marginBottom: 16 },
     button: {
       backgroundColor: colors.accent,
       borderRadius: 8,
@@ -214,6 +214,6 @@ const makeStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    buttonText: { color: colors.accentText, fontSize: 15, fontWeight: '600' },
-    hint: { marginTop: 16, fontSize: 13, lineHeight: 19, color: colors.textTertiary },
+    buttonText: { color: colors.accentText, fontSize: fs(15), fontWeight: '600' },
+    hint: { marginTop: 16, fontSize: fs(13), lineHeight: fs(19), color: colors.textTertiary },
   });

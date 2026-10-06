@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { MoreIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 import { IconButton } from './ui.tsx';
@@ -56,5 +56,5 @@ export function Menu({ items, 'aria-label': label }: { items: MenuItem[]; 'aria-
 const styles = StyleSheet.create({
   menu: { paddingVertical: 4, minWidth: 200 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  label: { fontSize: 14 },
+  label: { fontSize: fs(14) },
 });

@@ -5,7 +5,7 @@ import type { Calendar } from '../../api/caldav.ts';
 import type { Task } from '../../api/tasks.ts';
 import { describeDue, describeRepeat, type DueTone } from '../../lib/format.ts';
 import { InlineMarkdown, previewLine } from '../../lib/markdown.tsx';
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import { BLOCK_FIELDS, type RowField } from '../../lib/viewSettings.ts';
 import { CalendarIcon, CheckIcon, ChevronDownIcon, HashIcon, MapPinIcon, RepeatIcon, SubtaskIcon, TagIcon } from '../controls/icons.tsx';
 
@@ -284,9 +284,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   body: { flex: 1, minWidth: 0, paddingLeft: 4 },
-  title: { fontSize: 14, lineHeight: 21 },
+  title: { fontSize: fs(14), lineHeight: fs(21) },
   struck: { textDecorationLine: 'line-through' },
-  small: { fontSize: 12, lineHeight: 18 },
+  small: { fontSize: fs(12), lineHeight: fs(18) },
   shrink: { flexShrink: 1 },
   block: { marginTop: 2 },
   meta: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 4, marginTop: 2 },

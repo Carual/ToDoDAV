@@ -12,7 +12,7 @@ import { describeDay } from '../lib/format.ts';
 import { todayDate } from '../lib/repeat.ts';
 import { useJournals } from '../state/journalsContext.tsx';
 import { useLoggedIn } from '../state/session.tsx';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 
 /** Below this width the layout is the phone one: narrower margins and time column. */
 const NARROW = 640;
@@ -189,6 +189,6 @@ const makeStyles = (colors: Colors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.divider,
     },
-    dayTitle: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: colors.text },
-    count: { fontSize: 14, color: colors.textTertiary },
+    dayTitle: { fontSize: fs(14), lineHeight: fs(21), fontWeight: '600', color: colors.text },
+    count: { fontSize: fs(14), color: colors.textTertiary },
   });

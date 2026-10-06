@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import { CloseIcon } from './icons.tsx';
 import { Button, IconButton } from './ui.tsx';
 
@@ -131,7 +131,7 @@ const makeStyles = (colors: Colors) =>
       borderBottomColor: colors.divider,
     },
     title: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    titleText: { fontSize: 14, fontWeight: '600', color: colors.text },
+    titleText: { fontSize: fs(14), fontWeight: '600', color: colors.text },
     body: { flexShrink: 1 },
     bodyContent: { paddingHorizontal: 20, paddingVertical: 16, gap: 20 },
     footer: {
@@ -144,11 +144,11 @@ const makeStyles = (colors: Colors) =>
       borderTopColor: colors.divider,
     },
     spacer: { flex: 1 },
-    link: { color: colors.link, fontSize: 14 },
+    link: { color: colors.link, fontSize: fs(14) },
     disabled: { opacity: 0.5 },
     section: { gap: 10 },
-    sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+    sectionTitle: { fontSize: fs(15), fontWeight: '700', color: colors.text },
     row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-    rowLabel: { fontSize: 13, color: colors.text },
-    note: { fontSize: 12, lineHeight: 18, color: colors.textTertiary },
+    rowLabel: { fontSize: fs(13), color: colors.text },
+    note: { fontSize: fs(12), lineHeight: fs(18), color: colors.textTertiary },
   });

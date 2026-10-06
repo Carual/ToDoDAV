@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { DEFAULT_SETTINGS, ROW_FIELD_NAMES, type ListLayout, type ViewSettings } from '../../lib/viewSettings.ts';
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { ChevronDownIcon, ChevronUpIcon, GearIcon } from '../controls/icons.tsx';
 import { Select } from '../controls/Select.tsx';
 import { Note, Section, SettingRow, SmallDialog } from '../controls/SmallDialog.tsx';
@@ -33,7 +33,7 @@ export function SettingsModal({ settings, onChange, onImportExport, onClose }: P
     onChange({ ...settings, fields: next });
   }
 
-  const label = { fontSize: 13, color: colors.text };
+  const label = { fontSize: fs(13), color: colors.text };
 
   return (
     <SmallDialog

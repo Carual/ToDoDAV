@@ -9,7 +9,7 @@ import { download } from '../../lib/download';
 import { fileName } from '../../lib/fileName.ts';
 import { pickTextFile } from '../../lib/pickFile';
 import { readSetting, saveSetting } from '../../lib/viewSettings.ts';
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { HashIcon, TransferIcon } from '../controls/icons.tsx';
 import { Select, type SelectOption } from '../controls/Select.tsx';
 import { Section, SettingRow, SmallDialog } from '../controls/SmallDialog.tsx';
@@ -72,7 +72,7 @@ export function ImportExportModal({ client, calendars, calendarHref, compare, on
   const importing = importState.step === 'importing' || accountImporting;
   const busy = exporting || importing;
   const calendar = calendars.find((c) => c.href === href) ?? calendars[0]!;
-  const label = { fontSize: 13, color: colors.text };
+  const label = { fontSize: fs(13), color: colors.text };
 
   function setFormat(next: Format) {
     setFormatState(next);

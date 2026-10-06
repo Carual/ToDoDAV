@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { CheckIcon, ChevronDownIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 
@@ -96,10 +96,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     flexShrink: 1,
   },
-  value: { fontSize: 14, flexShrink: 1 },
+  value: { fontSize: fs(14), flexShrink: 1 },
   // Shrinks to the panel's height so long lists scroll inside it.
   list: { flexShrink: 1 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, minHeight: 40 },
-  optionLabel: { flexShrink: 1, fontSize: 14 },
+  optionLabel: { flexShrink: 1, fontSize: fs(14) },
   check: { width: 12, marginLeft: 'auto', paddingLeft: 8, boxSizing: 'content-box' },
 });

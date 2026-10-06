@@ -17,7 +17,7 @@ import {
   type TodoistAccount,
   type TodoistProject,
 } from '../../api/todoistApi.ts';
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import { HashIcon, PlusIcon } from '../controls/icons.tsx';
 import { Select, type SelectOption } from '../controls/Select.tsx';
 import { Section, SettingRow } from '../controls/SmallDialog.tsx';
@@ -472,7 +472,7 @@ export function TodoistImport({ client, calendars, calendarHref, onBusyChange, o
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     field: { gap: 6 },
-    fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.text },
+    fieldLabel: { fontSize: fs(13), fontWeight: '600', color: colors.text },
     input: {
       minHeight: 36,
       paddingHorizontal: 10,
@@ -481,11 +481,11 @@ const makeStyles = (colors: Colors) =>
       borderColor: colors.border,
       backgroundColor: colors.bg,
       color: colors.text,
-      fontSize: 14,
+      fontSize: fs(14),
     },
     projects: { gap: 8 },
     project: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     projectName: { flexShrink: 1, minWidth: 120 },
-    name: { fontSize: 13, color: colors.text },
-    count: { fontSize: 12, color: colors.textTertiary },
+    name: { fontSize: fs(13), color: colors.text },
+    count: { fontSize: fs(12), color: colors.textTertiary },
   });

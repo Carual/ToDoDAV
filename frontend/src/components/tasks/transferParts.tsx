@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 
 // What the import and export dialog and the Todoist account import share.
 
@@ -149,17 +149,17 @@ const layout = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { fontSize: 13, fontWeight: '600' },
+  buttonText: { fontSize: fs(13), fontWeight: '600' },
   disabled: { opacity: 0.5 },
 });
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    message: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
-    muted: { fontSize: 12, lineHeight: 18, color: colors.textTertiary },
+    message: { fontSize: fs(13), lineHeight: fs(20), color: colors.textSecondary },
+    muted: { fontSize: fs(12), lineHeight: fs(18), color: colors.textTertiary },
     error: { color: colors.p1 },
     warnings: { gap: 4, padding: 10, borderRadius: 6, backgroundColor: colors.bgSoft },
-    warning: { fontSize: 12, lineHeight: 18, color: colors.textSecondary },
+    warning: { fontSize: fs(12), lineHeight: fs(18), color: colors.textSecondary },
     failures: { gap: 4 },
-    failure: { fontSize: 12, lineHeight: 18, color: colors.textSecondary },
+    failure: { fontSize: fs(12), lineHeight: fs(18), color: colors.textSecondary },
   });

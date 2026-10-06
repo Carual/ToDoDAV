@@ -4,7 +4,7 @@ import type { Calendar } from '../../api/caldav.ts';
 import type { Journal } from '../../api/journals.ts';
 import { describeRepeat, formatTime } from '../../lib/format.ts';
 import { InlineMarkdown, previewLine } from '../../lib/markdown.tsx';
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import { HashIcon, MapPinIcon, RepeatIcon, TagIcon } from '../controls/icons.tsx';
 
 interface Props {
@@ -90,12 +90,12 @@ const makeStyles = (colors: Colors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.divider,
     },
-    time: { flexShrink: 0, fontSize: 12, lineHeight: 21, color: colors.textTertiary, fontVariant: ['tabular-nums'] },
+    time: { flexShrink: 0, fontSize: fs(12), lineHeight: fs(21), color: colors.textTertiary, fontVariant: ['tabular-nums'] },
     body: { flex: 1, minWidth: 0 },
-    title: { fontSize: 14, lineHeight: 21, color: colors.text },
+    title: { fontSize: fs(14), lineHeight: fs(21), color: colors.text },
     cancelled: { textDecorationLine: 'line-through', color: colors.textTertiary },
-    badge: { fontSize: 11, color: colors.textSecondary, backgroundColor: colors.bgSoft },
-    small: { fontSize: 12, lineHeight: 18 },
+    badge: { fontSize: fs(11), color: colors.textSecondary, backgroundColor: colors.bgSoft },
+    small: { fontSize: fs(12), lineHeight: fs(18) },
     muted: { color: colors.textTertiary },
     shrink: { flexShrink: 1 },
     meta: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 4, marginTop: 2 },

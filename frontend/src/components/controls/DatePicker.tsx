@@ -2,7 +2,7 @@ import { useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { describeDue, type DueTone } from '../../lib/format.ts';
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import {
   CalendarIcon,
   ChevronLeftIcon,
@@ -291,21 +291,21 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     flexShrink: 1,
   },
-  triggerText: { fontSize: 13, flexShrink: 1 },
+  triggerText: { fontSize: fs(13), flexShrink: 1 },
   quickList: { paddingVertical: 4, borderBottomWidth: StyleSheet.hairlineWidth },
   quick: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 7 },
   quickIcon: { width: 16, alignItems: 'center' },
-  quickLabel: { flex: 1, fontSize: 13, fontWeight: '600' },
-  quickHint: { fontSize: 12 },
+  quickLabel: { flex: 1, fontSize: fs(13), fontWeight: '600' },
+  quickHint: { fontSize: fs(12) },
   month: { padding: 8 },
   monthHeader: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 4, paddingLeft: 4 },
-  monthTitle: { flex: 1, fontSize: 13, fontWeight: '700' },
+  monthTitle: { flex: 1, fontSize: fs(13), fontWeight: '700' },
   todayDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5 },
   week: { flexDirection: 'row' },
   cell: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', textAlign: 'center' },
-  weekday: { fontSize: 11, lineHeight: 34 },
+  weekday: { fontSize: fs(11), lineHeight: 34 },
   day: { borderRadius: 17 },
-  dayText: { fontSize: 13 },
+  dayText: { fontSize: fs(13) },
   bold: { fontWeight: '700' },
   faded: { opacity: 0.4 },
 });

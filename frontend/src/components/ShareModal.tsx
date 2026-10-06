@@ -5,7 +5,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import type { Calendar, CalDavClient } from '../api/caldav.ts';
 import type { Priority } from '../api/tasks.ts';
 import { ALL_PRIORITIES, readSetting, saveSetting } from '../lib/viewSettings.ts';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 import { FlagIcon, ShareIcon } from './controls/icons.tsx';
 import { Select } from './controls/Select.tsx';
 import { Note, Section, SettingRow, SmallDialog } from './controls/SmallDialog.tsx';
@@ -118,7 +118,7 @@ export function ShareModal({ client, calendar, token, section = 'tasks', onClose
     update({ priorities });
   }
 
-  const label = { fontSize: 13, color: colors.text };
+  const label = { fontSize: fs(13), color: colors.text };
 
   return (
     <SmallDialog label="Add to Google Calendar" icon={<ShareIcon color={colors.textSecondary} size={16} />} onClose={onClose}>
@@ -270,7 +270,7 @@ function FeedLinkField({ url }: { url: string }) {
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    intro: { fontSize: 13, lineHeight: 20, color: colors.textSecondary },
+    intro: { fontSize: fs(13), lineHeight: fs(20), color: colors.textSecondary },
     strong: { fontWeight: '700', color: colors.text },
     // Options that only apply while the switch above them is on.
     nested: { gap: 10, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.divider },
@@ -286,7 +286,7 @@ const makeStyles = (colors: Colors) =>
       borderWidth: 1,
       borderRadius: 5,
     },
-    toggleText: { fontSize: 12 },
+    toggleText: { fontSize: fs(12) },
     linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     linkInput: {
       flex: 1,
@@ -298,6 +298,6 @@ const makeStyles = (colors: Colors) =>
       borderColor: colors.border,
       backgroundColor: colors.bgSoft,
       color: colors.text,
-      fontSize: 13,
+      fontSize: fs(13),
     },
   });

@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { Dimensions, useColorScheme } from 'react-native';
 
 // Todoist-like look: light by default, dark when the system asks.
 const light = {
@@ -56,6 +56,14 @@ const dark: Colors = {
   link: '#5297ff',
   codeBg: 'rgba(255, 255, 255, 0.1)',
 };
+
+// Every font size and line height goes through fs, so the text can be resized in one place.
+// Only phones (web or app) get bigger text. It is read from the screen, not the window, so it is fixed
+// at startup (many styles are built once, when their module loads) and a narrow desktop window doesn't count.
+const screen = Dimensions.get('screen');
+const PHONE = Math.min(screen.width, screen.height) < 600;
+export const TEXT_SCALE = PHONE ? 1.15 : 1;
+export const fs = (size: number) => Math.round(size * TEXT_SCALE);
 
 export function useColors(): Colors {
   return useColorScheme() === 'dark' ? dark : light;

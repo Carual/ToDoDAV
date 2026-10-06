@@ -16,7 +16,7 @@ import { DEFAULT_SETTINGS, describeFilters, filtersActive, type Filters } from '
 import { ALL } from '../state/calendarChoice.ts';
 import { useLoggedIn } from '../state/session.tsx';
 import { useTasks } from '../state/tasksContext.tsx';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 
 /** Below this width the layout is the phone one: narrower margins and indents. */
 const NARROW = 640;
@@ -226,7 +226,7 @@ export function Tasks() {
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    link: { color: colors.link, fontSize: 14 },
+    link: { color: colors.link, fontSize: fs(14) },
     filterBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -239,5 +239,5 @@ const makeStyles = (colors: Colors) =>
       backgroundColor: colors.bgSoft,
     },
     filterSummary: { flex: 1 },
-    filterSummaryText: { fontSize: 13, color: colors.textSecondary },
+    filterSummaryText: { fontSize: fs(13), color: colors.textSecondary },
   });

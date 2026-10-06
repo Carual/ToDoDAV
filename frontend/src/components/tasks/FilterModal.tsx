@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Priority } from '../../api/tasks.ts';
 import { ALL_PRIORITIES, DEFAULT_SETTINGS, DUE_FILTER_NAMES, filtersActive, type DueFilter, type Filters } from '../../lib/viewSettings.ts';
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { FilterIcon, FlagIcon, TagIcon } from '../controls/icons.tsx';
 import { Select } from '../controls/Select.tsx';
 import { Section, SettingRow, SmallDialog } from '../controls/SmallDialog.tsx';
@@ -108,5 +108,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 5,
   },
-  toggleText: { fontSize: 12 },
+  toggleText: { fontSize: fs(12) },
 });

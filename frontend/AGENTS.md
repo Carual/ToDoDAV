@@ -32,4 +32,4 @@ npm manages the dependencies here too, with this folder's own `package.json` and
 - `ios/` and `android/` are generated (Continuous Native Generation) and ignored by git. Never create or edit them; configure native behavior in `app.json` and config plugins.
 - Expo Go only has its own bundled native modules. A library with other native code needs a development build (`npx expo run:android`, or `eas build --profile development`), so prefer Expo's modules.
 - Platform-specific files use `.native.ts` / `.web.ts` (or the plain `.ts` for the web): import them without the extension, so Metro picks the right one. Everything else is imported with its `.ts`/`.tsx` extension, like the rest of the repo.
-- No DOM and no CSS: React Native primitives and `StyleSheet`, colors from `src/theme.ts`. Code that needs the browser (`window`, `document`) checks `Platform.OS === 'web'` first.
+- No DOM and no CSS: React Native primitives and `StyleSheet`, colors from `src/theme.ts`. Font sizes and line heights go through `fs()` from `src/theme.ts`, which makes text bigger on phones (web or app). Code that needs the browser (`window`, `document`) checks `Platform.OS === 'web'` first.

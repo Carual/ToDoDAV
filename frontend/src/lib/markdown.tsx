@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { isSafeHref, parseInline, parseMarkdown, type Block, type Inline } from '../../../shared/markdown.ts';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 
 export { hasMarkdown, plainText, previewLine } from '../../../shared/markdown.ts';
 
@@ -93,7 +93,7 @@ function renderBlocks(blocks: Block[], colors: Colors, baseStyle: object): React
           <Text
             key={i}
             role="heading"
-            style={[baseStyle, styles.heading, { fontSize: HEADING_SIZES[block.level - 1] ?? 14 }, !last && styles.gap]}
+            style={[baseStyle, styles.heading, { fontSize: fs(HEADING_SIZES[block.level - 1] ?? 14) }, !last && styles.gap]}
           >
             <InlineMarkdown text={block.text} />
           </Text>
@@ -101,7 +101,7 @@ function renderBlocks(blocks: Block[], colors: Colors, baseStyle: object): React
       case 'code':
         return (
           <View key={i} style={[styles.pre, { backgroundColor: colors.codeBg }, !last && styles.gap]}>
-            <Text style={[baseStyle, { fontFamily: MONO, fontSize: 13 }]}>{block.text}</Text>
+            <Text style={[baseStyle, { fontFamily: MONO, fontSize: fs(13) }]}>{block.text}</Text>
           </View>
         );
       case 'quote':

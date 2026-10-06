@@ -14,7 +14,7 @@ import {
   type Frequency,
   type RepeatForm,
 } from '../../lib/repeat.ts';
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { DatePicker } from '../controls/DatePicker.tsx';
 import { Select, type SelectOption } from '../controls/Select.tsx';
 import { SwitchRow } from '../controls/ui.tsx';
@@ -216,19 +216,19 @@ const styles = StyleSheet.create({
   field: { gap: 8 },
   custom: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  text: { fontSize: 13 },
+  text: { fontSize: fs(13) },
   number: {
     width: 52,
     minHeight: 32,
     paddingHorizontal: 8,
     borderWidth: 1,
     borderRadius: 6,
-    fontSize: 13,
+    fontSize: fs(13),
     textAlign: 'center',
     outlineWidth: 0,
   },
   days: { flexDirection: 'row', gap: 4 },
   day: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  dayText: { fontSize: 12, fontWeight: '600' },
-  summary: { fontSize: 12 },
+  dayText: { fontSize: fs(12), fontWeight: '600' },
+  summary: { fontSize: fs(12) },
 });

@@ -1,7 +1,7 @@
 import type { ReactNode, Ref } from 'react';
 import { Pressable, Switch, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 
 // Small building blocks shared by the screens: the app's buttons and switches.
 
@@ -119,11 +119,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { fontSize: 13, fontWeight: '600' },
+  buttonText: { fontSize: fs(13), fontWeight: '600' },
   disabled: { opacity: 0.5 },
   icon: { alignItems: 'center', justifyContent: 'center' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   // The row takes every tap, so one tap on the switch itself doesn't toggle it twice.
   switch: { transform: [{ scale: 0.8 }], marginVertical: -6, pointerEvents: 'none' },
-  switchLabel: { fontSize: 12 },
+  switchLabel: { fontSize: fs(12) },
 });

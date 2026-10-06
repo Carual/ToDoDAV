@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 
 export interface ToastMessage {
   message: string;
@@ -83,6 +83,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
   },
-  message: { fontSize: 13, flexShrink: 1 },
-  action: { fontSize: 13, fontWeight: '600' },
+  message: { fontSize: fs(13), flexShrink: 1 },
+  action: { fontSize: fs(13), fontWeight: '600' },
 });

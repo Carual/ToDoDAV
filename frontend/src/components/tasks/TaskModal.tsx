@@ -10,7 +10,7 @@ import { fileName } from '../../lib/fileName.ts';
 import { describeDue } from '../../lib/format.ts';
 import { hasMarkdown, InlineMarkdown, Markdown, plainText } from '../../lib/markdown.tsx';
 import { addDaysTo, daysBetween, firstOccurrence, moveRule, repeatProblem, todayDate, withUntilFor } from '../../lib/repeat.ts';
-import { useColors, type Colors } from '../../theme.ts';
+import { useColors, fs, type Colors } from '../../theme.ts';
 import { ConfirmDialog } from '../controls/ConfirmDialog.tsx';
 import { CheckIcon, DownloadIcon, FlagIcon, PlusIcon, RepeatIcon, TrashIcon } from '../controls/icons.tsx';
 import type { MenuItem } from '../controls/Menu.tsx';
@@ -553,7 +553,7 @@ function SubtaskRow({
       </Text>
       {due && dueTint && (
         <View style={styles.subtaskDue}>
-          <Text style={{ fontSize: 12, color: dueTint }}>{due.label}</Text>
+          <Text style={{ fontSize: fs(12), color: dueTint }}>{due.label}</Text>
           {task.recurrence && <RepeatIcon color={dueTint} />}
         </View>
       )}
@@ -566,11 +566,11 @@ const makeStyles = (colors: Colors) =>
     titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
     titleCheck: { marginTop: 6 },
     staticCheck: { width: 18, height: 18, borderRadius: 9, marginTop: 2 },
-    crumbText: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
+    crumbText: { fontSize: fs(13), color: colors.textSecondary, flexShrink: 1 },
     crumbLink: { flexShrink: 1, minWidth: 0, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 4 },
     struck: { textDecorationLine: 'line-through', color: colors.textTertiary },
     subtasks: { marginTop: 16, paddingLeft: 26 },
-    subtasksTitle: { fontSize: 13, fontWeight: '600', color: colors.text, marginBottom: 4 },
+    subtasksTitle: { fontSize: fs(13), fontWeight: '600', color: colors.text, marginBottom: 4 },
     subtask: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -579,7 +579,7 @@ const makeStyles = (colors: Colors) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: colors.divider,
     },
-    subtaskTitle: { flex: 1, minWidth: 0, fontSize: 14, lineHeight: 21, color: colors.text },
+    subtaskTitle: { flex: 1, minWidth: 0, fontSize: fs(14), lineHeight: fs(21), color: colors.text },
     subtaskDue: { flexDirection: 'row', alignItems: 'center', gap: 3 },
     subtaskAdd: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
     subtaskInput: {
@@ -589,12 +589,12 @@ const makeStyles = (colors: Colors) =>
       borderRadius: 5,
       paddingHorizontal: 8,
       paddingVertical: 6,
-      fontSize: 14,
+      fontSize: fs(14),
       color: colors.text,
       outlineWidth: 0,
     },
     addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
-    addText: { fontSize: 14, color: colors.textTertiary },
+    addText: { fontSize: fs(14), color: colors.textTertiary },
     priorities: { flexDirection: 'row', gap: 4 },
     priority: { width: 34, height: 34, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   });

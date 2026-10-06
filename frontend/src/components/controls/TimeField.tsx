@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { formatTime } from '../../lib/format.ts';
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { ClockIcon } from './icons.tsx';
 import { Popover } from './Popover.tsx';
 
@@ -98,7 +98,7 @@ export function TimeField({ value, onChange, 'aria-label': label }: Props) {
               onPress={() => pick(typed)}
               style={({ pressed, hovered }) => [styles.slot, (pressed || hovered) && { backgroundColor: colors.bgHover }]}
             >
-              <Text style={{ color: typed ? colors.accent : colors.textTertiary, fontSize: 14 }}>
+              <Text style={{ color: typed ? colors.accent : colors.textTertiary, fontSize: fs(14) }}>
                 {typed ? `Set ${formatTime(typed)}` : 'Not a time'}
               </Text>
             </Pressable>
@@ -121,7 +121,7 @@ export function TimeField({ value, onChange, 'aria-label': label }: Props) {
                   slot === value && { backgroundColor: colors.bgSoft },
                 ]}
               >
-                <Text style={{ color: slot === value ? colors.accent : colors.text, fontSize: 14 }}>{formatTime(slot)}</Text>
+                <Text style={{ color: slot === value ? colors.accent : colors.text, fontSize: fs(14) }}>{formatTime(slot)}</Text>
               </Pressable>
             )}
           />
@@ -141,8 +141,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 6,
   },
-  text: { fontSize: 13 },
-  input: { fontSize: 14, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, outlineWidth: 0 },
+  text: { fontSize: fs(13) },
+  input: { fontSize: fs(14), paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, outlineWidth: 0 },
   // Shrinks to the panel's height so the list scrolls inside it.
   list: { flexShrink: 1 },
   slot: { height: SLOT_HEIGHT, justifyContent: 'center', paddingHorizontal: 12 },

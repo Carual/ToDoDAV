@@ -17,7 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { readSetting, saveSetting } from '../lib/viewSettings.ts';
 import { ALL, type CalendarChoice } from '../state/calendarChoice.ts';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 import { ChevronDownIcon, HashIcon, LayersIcon, PlusIcon, ShareIcon } from './controls/icons.tsx';
 import { Select } from './controls/Select.tsx';
 import { Button, IconButton } from './controls/ui.tsx';
@@ -280,17 +280,17 @@ const makeStyles = (colors: Colors) =>
       borderRadius: 5,
       backgroundColor: colors.bgSoft,
     },
-    errorText: { flex: 1, fontSize: 13, color: colors.p1 },
+    errorText: { flex: 1, fontSize: fs(13), color: colors.p1 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
-    title: { flexShrink: 1, fontSize: 26, lineHeight: 35, fontWeight: '700', color: colors.text },
+    title: { flexShrink: 1, fontSize: fs(26), lineHeight: fs(35), fontWeight: '700', color: colors.text },
     actions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
     select: { maxWidth: 220 },
     addRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
     addIcon: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-    addText: { fontSize: 14, lineHeight: 21, color: colors.textTertiary },
+    addText: { fontSize: fs(14), lineHeight: fs(21), color: colors.textTertiary },
     empty: { alignItems: 'center', paddingVertical: 64 },
-    emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 4 },
-    emptyText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
+    emptyTitle: { fontSize: fs(16), fontWeight: '700', color: colors.text, marginBottom: 4 },
+    emptyText: { fontSize: fs(13), color: colors.textSecondary, textAlign: 'center', marginBottom: 16 },
     sectionToggle: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -301,6 +301,6 @@ const makeStyles = (colors: Colors) =>
       borderBottomColor: colors.divider,
     },
     rotated: { transform: [{ rotate: '-90deg' }] },
-    sectionTitle: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: colors.text },
-    count: { fontSize: 14, color: colors.textTertiary },
+    sectionTitle: { fontSize: fs(14), lineHeight: fs(21), fontWeight: '600', color: colors.text },
+    count: { fontSize: fs(14), color: colors.textTertiary },
   });

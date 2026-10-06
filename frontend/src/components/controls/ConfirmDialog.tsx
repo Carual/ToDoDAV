@@ -1,6 +1,6 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useColors } from '../../theme.ts';
+import { useColors, fs } from '../../theme.ts';
 import { Button } from './ui.tsx';
 
 interface Props {
@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     padding: 20,
     boxShadow: '0 15px 50px rgba(0, 0, 0, 0.35)',
   },
-  title: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  message: { fontSize: 14, lineHeight: 21 },
+  title: { fontSize: fs(16), fontWeight: '700', marginBottom: 8 },
+  message: { fontSize: fs(14), lineHeight: fs(21) },
   footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8, marginTop: 20 },
 });

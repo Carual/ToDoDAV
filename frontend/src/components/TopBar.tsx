@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useLoggedIn } from '../state/session.tsx';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 import { GearIcon } from './controls/icons.tsx';
 import { IconButton } from './controls/ui.tsx';
 import { LogoMark } from './LogoMark.tsx';
@@ -98,11 +98,11 @@ const makeStyles = (colors: Colors) =>
     },
     start: { flexDirection: 'row', alignItems: 'stretch', gap: 16, minWidth: 0 },
     brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    brandText: { fontSize: 16, fontWeight: '700', color: colors.text },
+    brandText: { fontSize: fs(16), fontWeight: '700', color: colors.text },
     tabs: { flexDirection: 'row', gap: 4 },
     // Plain tabs, the current one underlined in the accent color.
     tab: { justifyContent: 'center', paddingHorizontal: 8, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-    tabText: { fontSize: 14, fontWeight: '600' },
+    tabText: { fontSize: fs(14), fontWeight: '600' },
     account: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     avatar: {
       width: 26,
@@ -112,7 +112,7 @@ const makeStyles = (colors: Colors) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avatarText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-    accountName: { color: colors.text, fontWeight: '600', fontSize: 14 },
-    link: { color: colors.link, fontSize: 14 },
+    avatarText: { color: '#fff', fontSize: fs(12), fontWeight: '700' },
+    accountName: { color: colors.text, fontWeight: '600', fontSize: fs(14) },
+    link: { color: colors.link, fontSize: fs(14) },
   });

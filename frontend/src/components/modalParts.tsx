@@ -21,7 +21,7 @@ import type { LocalDate } from '../api/ical.ts';
 import { describeDue, formatDateTime } from '../lib/format.ts';
 import { setLeaveGuard } from '../leaveGuard.ts';
 import { todayDate } from '../lib/repeat.ts';
-import { useColors, type Colors } from '../theme.ts';
+import { useColors, fs, type Colors } from '../theme.ts';
 import { ConfirmDialog } from './controls/ConfirmDialog.tsx';
 import { DatePicker } from './controls/DatePicker.tsx';
 import { CloseIcon, HashIcon, MapPinIcon, PencilIcon } from './controls/icons.tsx';
@@ -657,8 +657,8 @@ export function useModalStyles() {
 }
 
 const makeStyles = (colors: Colors) => {
-  const titleText: TextStyle = { fontSize: 20, fontWeight: '700', lineHeight: 30, color: colors.text };
-  const descriptionText: TextStyle = { fontSize: 14, lineHeight: 21, color: colors.text };
+  const titleText: TextStyle = { fontSize: fs(20), fontWeight: '700', lineHeight: fs(30), color: colors.text };
+  const descriptionText: TextStyle = { fontSize: fs(14), lineHeight: fs(21), color: colors.text };
   return StyleSheet.create({
     backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.bg },
     backdropWide: {
@@ -689,7 +689,7 @@ const makeStyles = (colors: Colors) => {
       borderBottomColor: colors.divider,
     },
     crumb: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1, minWidth: 0 },
-    crumbText: { fontSize: 13, color: colors.textSecondary, flexShrink: 1 },
+    crumbText: { fontSize: fs(13), color: colors.textSecondary, flexShrink: 1 },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
     contentWide: { flexDirection: 'row', flexShrink: 1, minHeight: 0 },
     grow: { flex: 1, minWidth: 0 },
@@ -721,13 +721,13 @@ const makeStyles = (colors: Colors) => {
       borderBottomColor: colors.divider,
     },
     sidebarItemHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-    sidebarTitle: { fontSize: 12, fontWeight: '600', color: colors.textSecondary },
+    sidebarTitle: { fontSize: fs(12), fontWeight: '600', color: colors.textSecondary },
     switches: { flexDirection: 'row', gap: 10 },
     inline: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-    value: { fontSize: 14, color: colors.text },
-    note: { fontSize: 12, flexShrink: 1, color: colors.textTertiary },
+    value: { fontSize: fs(14), color: colors.text },
+    note: { fontSize: fs(12), flexShrink: 1, color: colors.textTertiary },
     dateField: { gap: 4 },
-    fieldLabel: { fontSize: 12, color: colors.textTertiary },
+    fieldLabel: { fontSize: fs(12), color: colors.textTertiary },
     textInput: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -735,14 +735,14 @@ const makeStyles = (colors: Colors) => {
       backgroundColor: colors.bg,
       paddingHorizontal: 8,
       paddingVertical: 6,
-      fontSize: 13,
+      fontSize: fs(13),
       color: colors.text,
       outlineWidth: 0,
     },
     detail: { flexDirection: 'row', gap: 8 },
-    detailTerm: { width: 70, fontSize: 12, color: colors.textTertiary },
-    detailValue: { flex: 1, fontSize: 12, color: colors.text },
-    uid: { marginTop: 12, fontSize: 11, color: colors.textTertiary },
+    detailTerm: { width: 70, fontSize: fs(12), color: colors.textTertiary },
+    detailValue: { flex: 1, fontSize: fs(12), color: colors.text },
+    uid: { marginTop: 12, fontSize: fs(11), color: colors.textTertiary },
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -753,6 +753,6 @@ const makeStyles = (colors: Colors) => {
       borderTopColor: colors.divider,
       backgroundColor: colors.bg,
     },
-    footerMessage: { flex: 1, minWidth: 0, fontSize: 13, color: colors.p1 },
+    footerMessage: { flex: 1, minWidth: 0, fontSize: fs(13), color: colors.p1 },
   });
 };
