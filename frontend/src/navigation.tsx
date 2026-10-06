@@ -1,3 +1,4 @@
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import {
   createNavigationContainerRef,
   DarkTheme,
@@ -67,7 +68,11 @@ const APP_PATH = /^\/?(tasks|journal)(\/|\?|$)/;
 
 const navigationRef = createNavigationContainerRef<RootParams>();
 
-const Root = createNativeStackNavigator<RootParams>();
+// Tasks and Journal are the TopBar's tabs, so the root is a tab navigator with its own bar hidden: switching only
+// changes which section shows, and each keeps its state while hidden. In a stack, every switch moved the other section
+// to the top, and a quick run of those reorders left react-native-screens on Android with no screen attached (white,
+// and deaf to touches).
+const Root = createBottomTabNavigator<RootParams>();
 const TasksStack = createNativeStackNavigator<TasksParams>();
 const JournalStack = createNativeStackNavigator<JournalParams>();
 
@@ -77,9 +82,6 @@ const overList: NativeStackNavigationOptions = {
   animation: 'fade',
   contentStyle: { backgroundColor: 'transparent' },
 };
-
-/** Tasks and Journal are the TopBar's tabs: one of each (a fixed id), so switching brings the other back as it was. */
-const singular = () => 'singular';
 
 export function Navigation() {
   const { session } = useSession();
@@ -139,13 +141,18 @@ export function Navigation() {
       onStateChange={rememberPath}
     >
       <ToastProvider>
-        <Root.Navigator screenOptions={useScreenOptions()}>
+        <Root.Navigator
+          tabBar={() => null}
+          // Android's back button: from Journal to Tasks, then out of the app.
+          backBehavior="firstRoute"
+          screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: colors.bg } }}
+        >
           {session === null ? (
             <Root.Screen name="Login" component={Login} />
           ) : (
             <>
-              <Root.Screen name="Tasks" component={TasksSection} getId={singular} options={{ animation: 'none' }} />
-              <Root.Screen name="Journal" component={JournalSection} getId={singular} options={{ animation: 'none' }} />
+              <Root.Screen name="Tasks" component={TasksSection} />
+              <Root.Screen name="Journal" component={JournalSection} />
             </>
           )}
         </Root.Navigator>

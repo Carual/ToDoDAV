@@ -38,8 +38,9 @@ frontend/         The Expo app: its own package.json and node_modules (Expo pins
   metro.config.js   Watches ../shared; the web dev server forwards /proxy, /api and /feed to the backend
   src/navigation.tsx  Every screen, its URL and its options, in one file (React Navigation; file names don't make routes). Without a
                     session only Login; with one, the Tasks and Journal sections, each a provider and a stack (the page, and
-                    the task or entry over it as a transparentModal), all under one ToastProvider. A fixed getId keeps one of each section, so the
-                    TopBar's Tasks | Journal tabs bring the other back as it was left instead of stacking a new copy.
+                    the task or entry over it as a transparentModal), all under one ToastProvider. The sections sit in a tab navigator
+                    (bottom-tabs with its bar hidden, not a stack), so the TopBar's Tasks | Journal tabs only switch which one shows and each keeps its state
+                    (a stack reordered its screens on every switch, which left Android with a blank screen when done quickly).
                     A /tasks... or /journal... link opened without a session is kept (a getStateFromPath wrapper) and
                     followed after logging in; so is the page that was open when logging out
   src/screens/      Login, Tasks, Task, Journal, Entry (no "Screen" suffix: the folder says it)
