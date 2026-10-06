@@ -1,5 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useEffect } from 'react';
 
 import { TaskModal } from '../components/tasks/TaskModal.tsx';
 import { sortedChildren } from '../lib/taskRows.ts';
@@ -20,7 +21,17 @@ export function Task({ navigation, route }: NativeStackScreenProps<TasksParams, 
   // Back to the list under it: popTo lands on the list whatever is under this screen.
   const close = () => navigation.popTo('TaskList');
 
-  useFindElsewhere(uid, task === undefined && list.fetched, tasks, list.locate, () => {
+  // Completed tasks are only read when needed: the modal lists completed sub-tasks and deletes them with the task,
+  // and a link may be to a completed task, so read them before looking elsewhere.
+  const { includeCompleted } = list;
+  const listHref = task && list.listOf(task);
+  const shownKey = tasks.shownHrefs.join('\n');
+  useEffect(() => {
+    if (listHref) includeCompleted([listHref]);
+    else if (list.fetched && shownKey) includeCompleted(shownKey.split('\n'));
+  }, [listHref, list.fetched, shownKey, includeCompleted]);
+
+  useFindElsewhere(uid, task === undefined && list.complete, tasks, list.locate, () => {
     tasks.showToast({ message: 'Task not found' });
     close();
   });

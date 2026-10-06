@@ -220,8 +220,8 @@ export function AddRow({ label, onPress }: { label: string; onPress: () => void 
   );
 }
 
-/** The heading of a part of the list that can be folded (Completed, Notes). */
-export function SectionToggle({ title, count, open, onToggle }: { title: string; count: number; open: boolean; onToggle: () => void }) {
+/** The heading of a part of the list that can be folded (Completed, Notes); no count while it is unknown. */
+export function SectionToggle({ title, count, open, onToggle }: { title: string; count?: number; open: boolean; onToggle: () => void }) {
   const colors = useColors();
   const styles = makeStyles(colors);
   return (
@@ -230,7 +230,7 @@ export function SectionToggle({ title, count, open, onToggle }: { title: string;
         <ChevronDownIcon color={colors.textTertiary} />
       </View>
       <Text style={styles.sectionTitle}>{title}</Text>
-      <Text style={styles.count}>{count}</Text>
+      {count !== undefined && <Text style={styles.count}>{count}</Text>}
     </Pressable>
   );
 }

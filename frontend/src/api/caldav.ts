@@ -173,9 +173,15 @@ export class CalDavClient {
     return { href, name, color };
   }
 
-  /** All tasks (open and completed) of one list. */
-  async listTasks(calendarHref: string): Promise<Task[]> {
-    return (await this.query(calendarHref, 'VTODO')).flatMap(({ href, etag, data }) => {
+  /**
+   * All tasks (open and completed) of one list, or with `openOnly` those without a COMPLETED date. Not STATUS too:
+   * a text-match on a property fails when the property is missing (RFC 4791 9.7.2), which would drop open tasks
+   * without STATUS. A task with STATUS:COMPLETED and no date still comes back and shows as completed, and a server
+   * that ignores the filter sends everything; both are still right.
+   */
+  async listTasks(calendarHref: string, { openOnly = false } = {}): Promise<Task[]> {
+    const filter = openOnly ? '<c:prop-filter name="COMPLETED"><c:is-not-defined/></c:prop-filter>' : '';
+    return (await this.query(calendarHref, 'VTODO', filter)).flatMap(({ href, etag, data }) => {
       try {
         return [parseTask(href, etag, data)];
       } catch {
@@ -249,15 +255,19 @@ export class CalDavClient {
     return path.startsWith(this.basePath) ? path.slice(this.basePath.length) : path.replace(/^\//, '');
   }
 
-  /** Every object of one kind in a calendar, with its ETag and iCalendar text. */
-  private async query(calendarHref: string, component: Component): Promise<{ href: string; etag: string; data: string }[]> {
+  /** Every object of one kind in a calendar (matching `filter`, CalDAV filter elements), with its ETag and iCalendar text. */
+  private async query(
+    calendarHref: string,
+    component: Component,
+    filter = '',
+  ): Promise<{ href: string; etag: string; data: string }[]> {
     const response = await this.send('REPORT', calendarHref, {
       headers: { Depth: '1', 'Content-Type': XML },
       body:
         '<?xml version="1.0" encoding="utf-8"?>' +
         `<c:calendar-query xmlns:d="${DAV}" xmlns:c="${CALDAV}">` +
         '<d:prop><d:getetag/><c:calendar-data/></d:prop>' +
-        `<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="${component}"/></c:comp-filter></c:filter>` +
+        `<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="${component}">${filter}</c:comp-filter></c:comp-filter></c:filter>` +
         '</c:calendar-query>',
     });
     return parseMultistatus(await response.text()).flatMap((item) => {

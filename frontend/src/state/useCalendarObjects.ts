@@ -18,6 +18,12 @@ export interface CalendarObject {
 /** How to read one kind of calendar object (tasks, journal entries). Keep it a module constant: it is a dependency. */
 export interface ObjectKind<T extends CalendarObject> {
   list: (client: CalDavClient, calendarHref: string) => Promise<T[]>;
+  /**
+   * Only the open objects (tasks not completed), read instead of `list` until a calendar's others are asked for
+   * with includeCompleted: they can be thousands. Without it, calendars are always read in full.
+   */
+  listOpen?: (client: CalDavClient, calendarHref: string) => Promise<T[]>;
+  isOpen?: (item: T) => boolean;
   parse: (href: string, etag: string, ics: string) => T;
   /** "task", "entry": for messages. */
   noun: string;
@@ -67,6 +73,10 @@ export function useCalendarObjects<T extends CalendarObject>(
   const [fetched, setFetched] = useState<ReadonlySet<string>>(() => new Set());
   /** Why the last load of a list failed, per list href. */
   const [loadErrors, setLoadErrors] = useState<Readonly<Record<string, string>>>({});
+  /** Lists whose completed objects were asked for: from then on they are always read in full. */
+  const wanted = useRef(new Set<string>());
+  /** Lists read in full at least once, so they hold their completed objects too. */
+  const [complete, setComplete] = useState<ReadonlySet<string>>(() => new Set());
   const loadIds = useRef(new Map<string, number>());
   /**
    * Saves still on their way, per object href; each resolves to the object as the server then has it (null once
@@ -107,10 +117,21 @@ export function useCalendarObjects<T extends CalendarObject>(
         return others;
       });
       try {
-        const fresh = await kind.list(client, href);
+        const full = !kind.listOpen || wanted.current.has(href);
+        const fresh = await (full ? kind.list(client, href) : kind.listOpen!(client, href));
         if (loadIds.current.get(href) !== id) return; // a newer load of this list wins
-        setLists((current) => ({ ...current, [href]: withPending(current[href], fresh) }));
+        setLists((current) => {
+          const merged = withPending(current[href], fresh);
+          if (full) return { ...current, [href]: merged };
+          // The open ones only: keep the completed ones already here (one completed a moment ago still needs Undo).
+          const freshHrefs = new Set(fresh.map((t) => t.href));
+          const kept = (current[href] ?? NONE).filter(
+            (t) => !kind.isOpen!(t) && !freshHrefs.has(t.href) && !pending.current.has(t.href),
+          );
+          return { ...current, [href]: [...merged, ...kept] };
+        });
         setFetched((current) => new Set(current).add(href));
+        if (full) setComplete((current) => new Set(current).add(href));
       } catch (err) {
         if (err instanceof CalDavError && err.status === 401) return callbacks.current.onLogout();
         if (loadIds.current.get(href) !== id) return;
@@ -119,6 +140,18 @@ export function useCalendarObjects<T extends CalendarObject>(
       }
     },
     [kind, client, setLists, withPending],
+  );
+
+  /** Reads these lists in full, completed objects included, now and on every later load. */
+  const includeCompleted = useCallback(
+    (hrefs: string[]) => {
+      for (const href of hrefs) {
+        if (wanted.current.has(href)) continue;
+        wanted.current.add(href);
+        void load(href);
+      }
+    },
+    [load],
   );
 
   // Hrefs never hold a newline, so the joined key only changes when the lists on screen do.
@@ -244,6 +277,8 @@ export function useCalendarObjects<T extends CalendarObject>(
         if (!fresh) continue;
         setLists((current) => ({ ...current, [calendar.href]: withPending(current[calendar.href], fresh) }));
         setFetched((current) => new Set(current).add(calendar.href));
+        wanted.current.add(calendar.href); // read in full here, so it stays that way
+        setComplete((current) => new Set(current).add(calendar.href));
         if (fresh.some((t) => t.uid === uid)) return calendar.href;
       }
       return undefined;
@@ -265,6 +300,9 @@ export function useCalendarObjects<T extends CalendarObject>(
     reload: () => Promise.all(shown.map((href) => load(href))).then(() => {}),
     /** Fetches a list again, on screen or not (after an import wrote to it directly). */
     refresh: (href: string) => void load(href),
+    /** The lists on screen hold their completed objects too. */
+    complete: shown.length > 0 && shown.every((href) => complete.has(href)),
+    includeCompleted,
     change,
     insert,
     destroy,

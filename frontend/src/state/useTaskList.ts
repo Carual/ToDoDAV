@@ -14,6 +14,8 @@ export type { WriteError } from './useCalendarObjects.ts';
 
 const TASKS: ObjectKind<Task> = {
   list: (client, href) => client.listTasks(href),
+  listOpen: (client, href) => client.listTasks(href, { openOnly: true }),
+  isOpen: (task) => !task.completed,
   parse: parseTask,
   noun: 'task',
 };
@@ -34,6 +36,9 @@ export function useTaskList(options: ListOptions) {
     loadError: list.loadError,
     reload: list.reload,
     refresh: list.refresh,
+    /** The lists on screen hold their completed tasks too (they are only read once asked for). */
+    complete: list.complete,
+    includeCompleted: list.includeCompleted,
     create: (calendarHref: string, edits: TaskEdits, parentUid?: string) => {
       const { uid, ics } = newTaskIcs(edits, { parentUid });
       insert(calendarHref, client.objectHref(calendarHref, uid), ics);

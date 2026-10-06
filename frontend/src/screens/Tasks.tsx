@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import type { Task } from '../api/tasks.ts';
 import { FilterIcon } from '../components/controls/icons.tsx';
@@ -26,7 +26,8 @@ type Item =
   | { kind: 'open'; row: Row }
   | { kind: 'add' }
   | { kind: 'empty'; title: string; text: string }
-  | { kind: 'completedHeader'; count: number }
+  | { kind: 'completedHeader'; count?: number }
+  | { kind: 'completedLoading' }
   | { kind: 'completed'; task: Task };
 
 export function Tasks() {
@@ -39,6 +40,12 @@ export function Tasks() {
   const hasLists = calendars.length > 0;
 
   const [showCompleted, toggleShowCompleted] = useFoldSetting('tododav.showCompleted', false);
+  // Completed tasks are only read once the section is opened: a list can have thousands.
+  const { includeCompleted } = list;
+  const shownKey = tasks.shownHrefs.join('\n');
+  useEffect(() => {
+    if (showCompleted && shownKey) includeCompleted(shownKey.split('\n'));
+  }, [showCompleted, shownKey, includeCompleted]);
   /** UIDs of the tasks whose sub-tasks are hidden in the list. */
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [creating, setCreating] = useState(false);
@@ -76,8 +83,14 @@ export function Tasks() {
             ? { kind: 'empty' as const, title: 'No matching tasks', text: `No open tasks ${where} match the filters.` }
             : { kind: 'empty' as const, title: 'All clear', text: `No open tasks ${where}.` },
         ]),
-    ...(completedTasks.length > 0 ? [{ kind: 'completedHeader' as const, count: completedTasks.length }] : []),
+    // Until they are read, whether there are any is unknown: the header shows, without a count.
+    ...(!list.complete
+      ? [{ kind: 'completedHeader' as const }]
+      : completedTasks.length > 0
+        ? [{ kind: 'completedHeader' as const, count: completedTasks.length }]
+        : []),
     ...(showCompleted ? completedTasks.map((task): Item => ({ kind: 'completed', task })) : []),
+    ...(showCompleted && !list.complete && !list.loadError ? [{ kind: 'completedLoading' as const }] : []),
   ];
 
   const indent = narrow ? 20 : 28;
@@ -107,6 +120,8 @@ export function Tasks() {
         return <EmptyState title={item.title} text={item.text} />;
       case 'completedHeader':
         return <SectionToggle title="Completed" count={item.count} open={showCompleted} onToggle={toggleShowCompleted} />;
+      case 'completedLoading':
+        return <ActivityIndicator accessibilityLabel="Loading completed tasks" color={colors.textTertiary} style={styles.completedLoading} />;
       case 'completed':
         return (
           <TaskItem
@@ -240,4 +255,5 @@ const makeStyles = (colors: Colors) =>
     },
     filterSummary: { flex: 1 },
     filterSummaryText: { fontSize: fs(13), color: colors.textSecondary },
+    completedLoading: { alignSelf: 'flex-start', marginVertical: 8, marginLeft: 4 },
   });
