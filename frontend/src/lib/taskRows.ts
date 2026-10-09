@@ -5,8 +5,11 @@ import type { TaskTree } from './taskTree.ts';
 
 export type Compare = (a: Task, b: Task) => number;
 
+/** What the task order looks at, so a row that isn't a whole Task (the widget's) sorts the same way. */
+type Sortable = Pick<Task, 'due' | 'priority' | 'summary'>;
+
 /** Open tasks by due date (undated ones last, or first if asked), then by priority, then by name. */
-export function taskOrder(undatedFirst: boolean): Compare {
+export function taskOrder(undatedFirst: boolean): (a: Sortable, b: Sortable) => number {
   return (a, b) => {
     if (!a.due !== !b.due) return (a.due ? -1 : 1) * (undatedFirst ? -1 : 1);
     // ISO dates compare correctly as plain strings; all-day tasks go after timed ones on the same day.

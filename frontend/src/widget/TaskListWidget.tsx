@@ -10,7 +10,8 @@ import type { WidgetRow, WidgetSnapshot } from './data.ts';
 
 // The home-screen widget, drawn with react-native-android-widget's primitives (native RemoteViews, not React Native
 // views): Todoist's list widget, with the list's name, + and refresh at the top and the open tasks under it. A tick
-// completes a task in the background; a tap anywhere else on a row opens it in the app.
+// shows the task ticked and struck through for a moment (a second tap undoes it), then takes it off (or moves a
+// repeating one to its next date) and saves in the background; a tap anywhere else on a row opens it in the app.
 
 export const WIDGET_NAME = 'TaskList';
 
@@ -55,7 +56,7 @@ const toneColor = (colors: Colors, tone: ReturnType<typeof describeDue>['tone'])
 const svg = (body: string, color: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 const CHECK = '<path d="M5 12.5l4.5 4.5L19 7.5"/>';
-const PLUS = '<path d="M12 5v14M5 12h14"/>';
+const PLUS ='<path d="M12 5v14M5 12h14"/>';
 const REFRESH_ICON = '<path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/>';
 
 function TaskListWidget({ snapshot, colors }: { snapshot: WidgetSnapshot; colors: Colors }) {
@@ -196,6 +197,12 @@ function Message({ title, text, colors }: { title: string; text: string; colors:
   );
 }
 
+/** Struck-through text: the widget's text has no strikethrough style, so a combining stroke follows each character. */
+const struck = (text: string) =>
+  Array.from(text)
+    .map((c) => (c === '\n' ? c : `${c}̶`))
+    .join('');
+
 function Row({ row, colors, now }: { row: WidgetRow; colors: Colors; now: Date }) {
   const color = priorityColor(colors, row.priority);
   const strong = row.priority !== 4;
@@ -220,9 +227,9 @@ function Row({ row, colors, now }: { row: WidgetRow; colors: Colors; now: Date }
     >
       {/* The tick's own area, bigger than the circle, so it is easy to hit without opening the task. */}
       <FlexWidget
-        clickAction={row.done ? undefined : COMPLETE}
-        clickActionData={{ href: row.href, calendarHref: row.calendarHref, recurring: row.recurring }}
-        accessibilityLabel={`Complete ${row.summary}`}
+        clickAction={COMPLETE}
+        clickActionData={{ href: row.href, calendarHref: row.calendarHref }}
+        accessibilityLabel={row.ticked ? `Undo completing ${row.summary}` : `Complete ${row.summary}`}
         style={{ paddingLeft: 10, paddingRight: 10, paddingTop: 10, paddingBottom: 10 }}
       >
         <FlexWidget
@@ -232,21 +239,21 @@ function Row({ row, colors, now }: { row: WidgetRow; colors: Colors; now: Date }
             borderRadius: 10,
             borderWidth: strong ? 2 : 1,
             borderColor: hex(color),
-            backgroundColor: row.done ? hex(color) : strong ? withAlpha(color, 0.1) : withAlpha(colors.bg, 0),
+            backgroundColor: row.ticked ? hex(color) : strong ? withAlpha(color, 0.1) : withAlpha(colors.bg, 0),
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          {row.done && <SvgWidget svg={svg(CHECK, '#ffffff')} style={{ width: 13, height: 13 }} />}
+          {row.ticked && <SvgWidget svg={svg(CHECK, '#ffffff')} style={{ width: 13, height: 13 }} />}
         </FlexWidget>
       </FlexWidget>
 
       <FlexWidget style={{ flex: 1, flexDirection: 'column', paddingVertical: 8 }}>
         <TextWidget
-          text={row.summary}
+          text={row.ticked ? struck(row.summary) : row.summary}
           maxLines={2}
           truncate="END"
-          style={{ fontSize: 15, color: hex(row.done ? colors.textTertiary : colors.text) }}
+          style={{ fontSize: 15, color: hex(row.ticked ? colors.textTertiary : colors.text) }}
         />
         {(dueText !== '' || labels !== '' || row.list) && (
           <FlexWidget style={{ width: 'match_parent', flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
